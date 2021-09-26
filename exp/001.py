@@ -400,6 +400,8 @@ for fold in range(5):
     )
  
     model = Pet2Model(CFG.MODEL_NAME)   
+    model = model.to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-5, T_max=CFG.epochs)
 
@@ -408,8 +410,6 @@ for fold in range(5):
     # ====================================================
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
-    else:
-        model = model.to(device)
 
     patience = 5
     p = 0
