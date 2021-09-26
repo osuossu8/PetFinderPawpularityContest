@@ -20,7 +20,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms as T
+# import torchvision.transforms as T
 from torch.optim import Adam, SGD
 from torch.nn.parameter import Parameter
 from torch.utils.data import DataLoader, Dataset
@@ -385,7 +385,7 @@ for fold in range(5):
     trn_df = train[train.kfold != fold].reset_index(drop=True)
     val_df = train[train.kfold == fold].reset_index(drop=True)
 
-    if DEBUG:
+    if CFG.DEBUG:
         trn_df = trn_df.head(1000)
         val_df = val_df.head(200)
 
