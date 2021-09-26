@@ -61,7 +61,7 @@ class CFG:
     EVALUATION = 'RMSE'
     IMG_SIZE = 256 # 900
     APEX = False # True
-    DEBUG = True
+    DEBUG = False # True
 
 CFG.get_transforms = {
         'train' : A.Compose([
