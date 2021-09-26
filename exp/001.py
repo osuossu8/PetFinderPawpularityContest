@@ -20,7 +20,6 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-# import torchvision.transforms as T
 from torch.optim import Adam, SGD
 from torch.nn.parameter import Parameter
 from torch.utils.data import DataLoader, Dataset
@@ -46,7 +45,7 @@ class CFG:
     ######################
     EXP_ID = '001'
     seed = 71
-    epochs = 20
+    epochs = 5
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-3
@@ -71,7 +70,7 @@ CFG.get_transforms = {
             A.RandomBrightnessContrast(p=0.2, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
             A.HueSaturationValue(p=0.2, hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2),
             A.ShiftScaleRotate(p=0.2, shift_limit=0.0625, scale_limit=0.2, rotate_limit=20),
-            A.CoarseDropout(p=0.2),
+            # A.CoarseDropout(p=0.2),
             A.Cutout(max_h_size=46, max_w_size=46, num_holes=5, p=0.5),
             A.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
             T.ToTensorV2()
@@ -134,6 +133,7 @@ class Pet2Dataset:
             path = CFG.train_root + self.X[item] + '.jpg'
             # features = np.load(path, allow_pickle=True)
             features = cv2.imread(path)
+            features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
             targets = self.y[item]
@@ -147,6 +147,7 @@ class Pet2Dataset:
             path = CFG.test_root + self.X[item] + '.jpg'
             # features = np.load(path, allow_pickle=True)
             features = cv2.imread(path)
+            features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
             if CFG.get_transforms:
                 features = CFG.get_transforms['valid'](image=features)['image']
 
@@ -311,7 +312,7 @@ def calc_cv(model_paths):
     models = []
     for model_path in model_paths:
         model = Pet2Model(CFG.MODEL_NAME)
-        model.to("cuda")
+        model.to(device)
         model.load_state_dict(torch.load(model_path))
         model.eval()
         models.append(model)
@@ -385,8 +386,8 @@ for fold in range(5):
     val_df = train[train.kfold == fold].reset_index(drop=True)
 
     if CFG.DEBUG:
-        trn_df = trn_df.head(1000)
-        val_df = val_df.head(200)
+        trn_df = trn_df.head(64)
+        val_df = val_df.head(16)
 
     train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values)
     train_dataloader = torch.utils.data.DataLoader(
@@ -410,7 +411,7 @@ for fold in range(5):
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-    patience = 5
+    patience = 3
     p = 0
     min_loss = 999
     best_score = np.inf
