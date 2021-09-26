@@ -45,7 +45,7 @@ class CFG:
     ######################
     EXP_ID = '001'
     seed = 71
-    epochs = 5
+    epochs = 3
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-3
@@ -60,8 +60,15 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 256 # 900
+    EARLY_STOPPING = False
     APEX = False # True
     DEBUG = False # True
+    FEATURE_COLS = [
+        'Subject Focus', 'Eyes', 'Face', 'Near', 'Action',
+        'Accessory', 'Group', 'Collage', 'Human', 'Occlusion', 
+        'Info', 'Blur',
+    ]
+
 
 CFG.get_transforms = {
         'train' : A.Compose([
@@ -121,9 +128,10 @@ def calc_loss(y_true, y_pred):
 
 
 class Pet2Dataset:
-    def __init__(self, X, y=None):
+    def __init__(self, X, y=None, Meta_features=None):
         self.X = X
         self.y = y
+        self.Meta_features = Meta_features
 
     def __len__(self):
         return len(self.X)
@@ -141,6 +149,7 @@ class Pet2Dataset:
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
                 'y': torch.tensor(targets, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features, dtype=torch.float32),
             }
           
         else:
@@ -153,6 +162,7 @@ class Pet2Dataset:
 
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features, dtype=torch.float32),
             }
 
 
@@ -190,18 +200,30 @@ class Pet2Model(nn.Module):
         self.avg_pool = GeM()
 
         self.dropout = nn.Dropout(0.2)
-        self.fc = nn.Linear(self.net.classifier.in_features, CFG.TARGET_DIM, bias=True)
+        self.l0 = nn.Linear(self.net.classifier.in_features, self.net.classifier.in_features//4, bias=True)
+
+        self.process_meta = nn.Sequential(
+            nn.Linear(12, 8),
+            nn.BatchNorm1d(8),
+            nn.PReLU(),
+            nn.Dropout(0.1),
+        )
         
+        self.fc = nn.Linear(self.net.classifier.in_features//4 + 8, CFG.TARGET_DIM, , bias=True)
         self.init_weight()
         
     def init_weight(self):
+        init_layer(self.l0)
         init_layer(self.fc)
 
-    def forward(self, features):
+    def forward(self, features, metas):
         
         x = self.net.forward_features(features)
         x = self.avg_pool(x).flatten(1)
         x = self.dropout(x)
+
+        meta = self.process_meta(metas)
+        x = torch.cat([x, meta], 1)
         output = self.fc(x)
         return output
 
@@ -275,7 +297,8 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         optimizer.zero_grad()
         inputs = data['x'].to(device)
         targets = data['y'].to(device)
-        outputs = model(inputs)
+        metas = data['meta'].to(device)
+        outputs = model(inputs, metas)
         loss = loss_fn(outputs, targets)
         if CFG.APEX:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -300,7 +323,8 @@ def valid_fn(model, data_loader, device):
         for data in tk0:
             inputs = data['x'].to(device)
             targets = data['y'].to(device)
-            outputs = model(inputs)
+            metas = data['meta'].to(device)
+            outputs = model(inputs, metas)
             loss = loss_fn(outputs, targets)
             losses.update(loss.item(), inputs.size(0))
             scores.update(targets, outputs)
@@ -389,12 +413,12 @@ for fold in range(5):
         trn_df = trn_df.head(64)
         val_df = val_df.head(16)
 
-    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values)
+    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values, Meta_features=trn_df[CFG.FEATURE_COLS].values)
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=CFG.train_bs, num_workers=0, pin_memory=True, shuffle=True
     )
     
-    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values)
+    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
     )
@@ -438,10 +462,11 @@ for fold in range(5):
             best_score = valid_avg[CFG.EVALUATION]
             p = 0 
 
-        p += 1
-        if p > patience:
-            logger.info(f'Early Stopping')
-            break
+        if CFG.EARLY_STOPPING:
+            p += 1
+            if p > patience:
+                logger.info(f'Early Stopping')
+                break
 
 
 if len(CFG.folds) == 1:
