@@ -61,7 +61,10 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 900
-    get_transforms = {
+    APEX = True
+    DEBUG = True
+
+CFG.get_transforms = {
         'train' : A.Compose([
             A.HorizontalFlip(p=0.5),
             A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE),
@@ -79,8 +82,6 @@ class CFG:
             T.ToTensorV2()
         ]),    
     }
-    APEX = True
-    DEBUG = True
 
 
 def set_seed(seed=42):
