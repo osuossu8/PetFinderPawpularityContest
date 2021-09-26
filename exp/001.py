@@ -221,6 +221,7 @@ class Pet2Model(nn.Module):
         x = self.net.forward_features(features)
         x = self.avg_pool(x).flatten(1)
         x = self.dropout(x)
+        x = self.l0(x)
 
         meta = self.process_meta(metas)
         x = torch.cat([x, meta], 1)
