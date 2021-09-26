@@ -52,7 +52,7 @@ class CFG:
     LR = 1e-3
     train_bs = 32
     valid_bs = 64 
-    train_root = 'input/train/'
+    train_root = 'input/train/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "tf_efficientnet_b1_ns"
     in_chans = 3
@@ -60,7 +60,7 @@ class CFG:
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
-    IMG_SIZE = 900
+    IMG_SIZE = 256 # 900
     APEX = False # True
     DEBUG = True
 
@@ -132,7 +132,7 @@ class Pet2Dataset:
     def __getitem__(self, item):
         if self.y is not None:
             path = CFG.train_root + self.X[item] + '.jpg'
-            # features = np.load(path)
+            # features = np.load(path, allow_pickle=True)
             features = cv2.imread(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
@@ -145,6 +145,7 @@ class Pet2Dataset:
           
         else:
             path = CFG.test_root + self.X[item] + '.jpg'
+            # features = np.load(path, allow_pickle=True)
             features = cv2.imread(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['valid'](image=features)['image']
