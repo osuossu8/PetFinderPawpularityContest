@@ -1,3 +1,6 @@
+import albumentations as A
+import albumentations.pytorch.transforms as T
+import cv2
 import gc
 import os
 import math
@@ -57,6 +60,26 @@ class CFG:
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
+    IMG_SIZE = 900
+    apex = True
+    get_transforms = {
+        'train' : A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE),
+            A.RandomBrightnessContrast(p=0.2, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+            A.HueSaturationValue(p=0.2, hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2),
+            A.ShiftScaleRotate(p=0.2, shift_limit=0.0625, scale_limit=0.2, rotate_limit=20),
+            A.CoarseDropout(p=0.2),
+            A.Cutout(max_h_size=46, max_w_size=46, num_holes=5, p=0.5),
+            A.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            T.ToTensorV2()
+        ]),
+        'valid' : A.Compose([
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE),
+            A.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            T.ToTensorV2()
+        ]),    
+    }
 
 
 def set_seed(seed=42):
@@ -90,6 +113,10 @@ def init_logger(log_file='train.log'):
 def calc_loss(y_true, y_pred):
     if CFG.EVALUATION == 'RMSE':
         return  np.sqrt(metrics.mean_squared_error(y_true, y_pred))
+    elif CFG.EVALUATION == 'AUC':
+        return metrics.roc_auc_score(np.array(y_true), np.array(y_pred))
+    else:
+        raise NotImplementedError()
 
 
 class Pet2Dataset:
@@ -105,6 +132,8 @@ class Pet2Dataset:
             path = CFG.train_root + self.X[item] + '.jpg'
             # features = np.load(path)
             features = cv2.imread(path)
+            if CFG.get_transforms:
+                features = CFG.get_transforms['train'](image=features)['image']
             targets = self.y[item]
         
             return {
@@ -115,6 +144,8 @@ class Pet2Dataset:
         else:
             path = CFG.test_root + self.X[item] + '.jpg'
             features = cv2.imread(path)
+            if CFG.get_transforms:
+                features = CFG.get_transforms['valid'](image=features)['image']
 
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
@@ -244,7 +275,11 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         targets = data['y'].to(device)
         outputs = model(inputs)
         loss = loss_fn(outputs, targets)
-        loss.backward()
+        if CFG.apex:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
         optimizer.step()
         scheduler.step()
         losses.update(loss.item(), inputs.size(0))
@@ -265,7 +300,6 @@ def valid_fn(model, data_loader, device):
             targets = data['y'].to(device)
             outputs = model(inputs)
             loss = loss_fn(outputs, targets)
-
             losses.update(loss.item(), inputs.size(0))
             scores.update(targets, outputs)
             tk0.set_postfix(loss=losses.avg)
@@ -364,8 +398,13 @@ for fold in range(5):
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-5, T_max=CFG.epochs)
 
-    model = model.to(device)
-    # model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
+    # ====================================================
+    # apex
+    # ====================================================
+    if CFG.apex:
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
+    else:
+        model = model.to(device)
 
     patience = 5
     p = 0
