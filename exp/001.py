@@ -61,7 +61,6 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 900
-    apex = True
     get_transforms = {
         'train' : A.Compose([
             A.HorizontalFlip(p=0.5),
@@ -80,6 +79,8 @@ class CFG:
             T.ToTensorV2()
         ]),    
     }
+    APEX = True
+    DEBUG = True
 
 
 def set_seed(seed=42):
@@ -275,7 +276,7 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         targets = data['y'].to(device)
         outputs = model(inputs)
         loss = loss_fn(outputs, targets)
-        if CFG.apex:
+        if CFG.APEX:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
@@ -382,8 +383,10 @@ for fold in range(5):
 
     trn_df = train[train.kfold != fold].reset_index(drop=True)
     val_df = train[train.kfold == fold].reset_index(drop=True)
-    
-    model = Pet2Model(CFG.MODEL_NAME)    
+
+    if DEBUG:
+        trn_df = trn_df.head(1000)
+        val_df = val_df.head(200)
 
     train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values)
     train_dataloader = torch.utils.data.DataLoader(
@@ -394,14 +397,15 @@ for fold in range(5):
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
     )
-    
+ 
+    model = Pet2Model(CFG.MODEL_NAME)   
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-5, T_max=CFG.epochs)
 
     # ====================================================
     # apex
     # ====================================================
-    if CFG.apex:
+    if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
     else:
         model = model.to(device)
@@ -409,7 +413,7 @@ for fold in range(5):
     patience = 5
     p = 0
     min_loss = 999
-    best_score = -np.inf
+    best_score = np.inf
 
     for epoch in range(CFG.epochs):
 
@@ -423,7 +427,6 @@ for fold in range(5):
         scheduler.step()
         
         elapsed = time.time() - start_time
-
 
         logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.5f}  avg_val_loss: {valid_loss:.5f}  time: {elapsed:.0f}s')
         logger.info(f"Epoch {epoch+1} - train_score:{train_avg[CFG.EVALUATION]:0.5f}  valid_score:{valid_avg[CFG.EVALUATION]:0.5f}")        
