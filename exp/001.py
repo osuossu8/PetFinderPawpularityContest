@@ -145,11 +145,11 @@ class Pet2Dataset:
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
             targets = self.y[item]
-        
+       
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
                 'y': torch.tensor(targets, dtype=torch.float32),
-                'meta': torch.tensor(self.Meta_features, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
             }
           
         else:
@@ -162,7 +162,7 @@ class Pet2Dataset:
 
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
-                'meta': torch.tensor(self.Meta_features, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
             }
 
 
@@ -217,7 +217,6 @@ class Pet2Model(nn.Module):
         init_layer(self.fc)
 
     def forward(self, features, metas):
-        
         x = self.net.forward_features(features)
         x = self.avg_pool(x).flatten(1)
         x = self.dropout(x)
@@ -360,8 +359,8 @@ def calc_cv(model_paths):
             with torch.no_grad():
                 inputs = data['x'].to(device)
                 targets = data['y'].to(device)
-
-                output = model(inputs)
+                metas = data['meta'].to(device)
+                output = model(inputs, metas)
                 output = output.detach().cpu().numpy().tolist()
                 final_output.extend(output)
         y_pred.append(np.array(final_output))
