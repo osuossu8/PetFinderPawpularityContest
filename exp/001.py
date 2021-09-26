@@ -209,7 +209,7 @@ class Pet2Model(nn.Module):
             nn.Dropout(0.1),
         )
         
-        self.fc = nn.Linear(self.net.classifier.in_features//4 + 8, CFG.TARGET_DIM, , bias=True)
+        self.fc = nn.Linear(self.net.classifier.in_features//4 + 8, CFG.TARGET_DIM, bias=True)
         self.init_weight()
         
     def init_weight(self):
