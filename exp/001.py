@@ -43,15 +43,20 @@ class CFG:
     ######################
     EXP_ID = '001'
     seed = 71
-    epochs = 3
+    epochs = 20
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-3
-    train_bs = 16 * 2 * 8
-    valid_bs = 32 * 2 * 8
-    train_wav_root = 'input/train/'
-    test_wav_root = 'input/test/'
+    train_bs = 32
+    valid_bs = 64 
+    train_root = 'input/train/'
+    test_root = 'input/test/'
     MODEL_NAME = "tf_efficientnet_b1_ns"
+    in_chans = 3
+    ID_COL = 'Id'
+    TARGET_COL = 'Pawpularity'
+    TARGET_DIM = 1
+    EVALUATION = 'RMSE'
 
 
 def set_seed(seed=42):
@@ -83,10 +88,11 @@ def init_logger(log_file='train.log'):
 
 
 def calc_loss(y_true, y_pred):
-    return roc_auc_score(y_true, y_pred)
+    if CFG.EVALUATION == 'RMSE':
+        return  np.sqrt(metrics.mean_squared_error(y_true, y_pred))
 
 
-class G2NetDataset:
+class Pet2Dataset:
     def __init__(self, X, y=None):
         self.X = X
         self.y = y
@@ -96,8 +102,9 @@ class G2NetDataset:
 
     def __getitem__(self, item):
         if self.y is not None:
-            path = CFG.train_wav_root + self.X[item] + '.npy'
-            features = np.load(path) # 27, 128
+            path = CFG.train_root + self.X[item] + '.jpg'
+            # features = np.load(path)
+            features = cv2.imread(path)
             targets = self.y[item]
         
             return {
@@ -106,8 +113,8 @@ class G2NetDataset:
             }
           
         else:
-            path = CFG.test_wav_root + self.X[item] + '.npy'
-            features = np.load(path) # 27, 128
+            path = CFG.test_root + self.X[item] + '.jpg'
+            features = cv2.imread(path)
 
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
@@ -139,16 +146,16 @@ class GeM(nn.Module):
         return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + ', ' + 'eps=' + str(self.eps) + ')'
     
     
-class G2NetModel(nn.Module):
+class Pet2Model(nn.Module):
     def __init__(self, model_name):
-        super(G2NetModel, self).__init__()    
+        super(Pet2Model, self).__init__()    
         
         # Model Encoder
-        self.net = timm.create_model(model_name, pretrained=True, in_chans=1)
+        self.net = timm.create_model(model_name, pretrained=True, in_chans=CFG.in_chans)
         self.avg_pool = GeM()
 
         self.dropout = nn.Dropout(0.2)
-        self.fc = nn.Linear(self.net.classifier.in_features, 1, bias=True)
+        self.fc = nn.Linear(self.net.classifier.in_features, CFG.TARGET_DIM, bias=True)
         
         self.init_weight()
         
@@ -202,19 +209,29 @@ class MetricMeter(object):
 
     @property
     def avg(self):
-        self.auc = calc_loss(self.y_true, self.y_pred)
+        self.score = calc_loss(self.y_true, self.y_pred)
        
         return {
-            "AUC" : self.auc,
+            CFG.EVALUATION : self.score,
         }
 
 
+class RMSELoss(torch.nn.Module):
+    def __init__(self):
+        super(RMSELoss,self).__init__()
+
+    def forward(self,x,y):
+        criterion = nn.MSELoss()
+        loss = torch.sqrt(criterion(x, y))
+        return loss
+
+
 def loss_fn(logits, targets):
-    loss_fct = torch.nn.BCEWithLogitsLoss(reduction="mean")
-    loss = loss_fct(logits.squeeze(-1), targets.squeeze(-1))
+    loss_fct = RMSELoss()
+    loss = loss_fct(logits, targets)
     return loss
-        
-        
+
+
 def train_fn(model, data_loader, device, optimizer, scheduler):
     model.train()
     losses = AverageMeter()
@@ -258,7 +275,7 @@ def valid_fn(model, data_loader, device):
 def calc_cv(model_paths):
     models = []
     for model_path in model_paths:
-        model = G2NetModel(CFG.MODEL_NAME)
+        model = Pet2Model(CFG.MODEL_NAME)
         model.to("cuda")
         model.load_state_dict(torch.load(model_path))
         model.eval()
@@ -272,7 +289,7 @@ def calc_cv(model_paths):
     for fold, model in enumerate(models):
         val_df = df[df.kfold == fold].reset_index(drop=True)
     
-        dataset = G2NetDataset(X=val_df["id"].values, y=val_df["target"].values)
+        dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values)
         data_loader = torch.utils.data.DataLoader(
             dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
         )
@@ -287,8 +304,8 @@ def calc_cv(model_paths):
                 output = output.detach().cpu().numpy().tolist()
                 final_output.extend(output)
         y_pred.append(np.array(final_output))
-        y_true.append(val_df["target"].values)
-        idx.append(val_df["id"].values)
+        y_true.append(val_df[CFG.TARGET_COL].values)
+        idx.append(val_df[CFG.ID_COL].values)
         torch.cuda.empty_cache()
         
     y_pred = np.concatenate(y_pred)
@@ -297,50 +314,13 @@ def calc_cv(model_paths):
     overall_cv_score = calc_loss(y_true, y_pred)
     logger.info(f'cv score {overall_cv_score}')
     oof_df = pd.DataFrame()
-    oof_df['id'] = idx
+    oof_df[CFG.ID_COL] = idx
     oof_df['oof'] = y_pred
-    oof_df['target'] = y_true
+    oof_df[CFG.TARGET_COL] = y_true
     oof_df.to_csv(OUTPUT_DIR+"oof.csv", index=False)
     print(oof_df.shape)
 
 
-def make_submission(model_paths):
-    models = []
-    for model_path in model_paths:
-        model = G2NetModel(CFG.MODEL_NAME)
-        model.to("cuda")
-        model.load_state_dict(torch.load(model_path))
-        model.eval()
-        models.append(model)
-
-    test = pd.read_csv("inputs/sample_submission.csv")
-
-    y_pred = []
-    for fold, model in enumerate(models):
-
-        dataset = G2NetDataset(X=test["id"].values)
-        data_loader = torch.utils.data.DataLoader(
-            dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
-        )
-
-        final_output = []
-        for b_idx, data in tqdm(enumerate(data_loader)):
-            with torch.no_grad():
-                inputs = data['x'].to(device)
-                output = model(inputs)
-                output = output.detach().cpu().numpy().tolist()
-                final_output.extend(output)
-        y_pred.append(np.array(final_output))
-        torch.cuda.empty_cache()
-
-    y_pred = np.mean(y_pred, 0)
-
-    sub = pd.read_csv("input/sample_submission.csv")
-    sub['target'] = y_pred
-    sub.to_csv(OUTPUT_DIR+"submission.csv", index=False)
-    print(sub.shape)
-
-       
 OUTPUT_DIR = f'output/{CFG.EXP_ID}/'
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -369,14 +349,14 @@ for fold in range(5):
     trn_df = train[train.kfold != fold].reset_index(drop=True)
     val_df = train[train.kfold == fold].reset_index(drop=True)
     
-    model = G2NetModel(CFG.MODEL_NAME)    
+    model = Pet2Model(CFG.MODEL_NAME)    
 
-    train_dataset = G2NetDataset(X=trn_df["id"].values, y=trn_df["target"].values)
+    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values)
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=CFG.train_bs, num_workers=0, pin_memory=True, shuffle=True
     )
     
-    valid_dataset = G2NetDataset(X=val_df["id"].values, y=val_df["target"].values)
+    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values)
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
     )
@@ -404,14 +384,15 @@ for fold in range(5):
         scheduler.step()
         
         elapsed = time.time() - start_time
-        
-        logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.5f}  avg_val_loss: {valid_loss:.5f}  time: {elapsed:.0f}s')
-        logger.info(f"Epoch {epoch+1} - train_auc:{train_avg['AUC']:0.5f}  valid_auc:{valid_avg['AUC']:0.5f}")
 
-        if valid_avg['AUC'] > best_score:
-            logger.info(f">>>>>>>> Model Improved From {best_score} ----> {valid_avg['AUC']}")
+
+        logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.5f}  avg_val_loss: {valid_loss:.5f}  time: {elapsed:.0f}s')
+        logger.info(f"Epoch {epoch+1} - train_score:{train_avg[CFG.EVALUATION]:0.5f}  valid_score:{valid_avg[CFG.EVALUATION]:0.5f}")        
+
+        if valid_avg[CFG.EVALUATION] < best_score:
+            logger.info(f">>>>>>>> Model Improved From {best_score} ----> {valid_avg[CFG.EVALUATION]}")
             torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
-            best_score = valid_avg['AUC']
+            best_score = valid_avg[CFG.EVALUATION]
             p = 0 
 
         p += 1
@@ -433,7 +414,3 @@ else:
 
     calc_cv(model_paths)
     print('calc cv finished!!')
-
-    make_submission(model_paths)
-    print('make sub finished!!')
-
