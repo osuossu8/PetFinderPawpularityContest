@@ -61,7 +61,7 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 900
-    APEX = True
+    APEX = False # True
     DEBUG = True
 
 CFG.get_transforms = {
@@ -197,9 +197,7 @@ class Pet2Model(nn.Module):
 
     def forward(self, features):
         
-        bs, h, w = features.size()
-
-        x = self.net.forward_features(features.reshape(bs, 1, h, w))
+        x = self.net.forward_features(features)
         x = self.avg_pool(x).flatten(1)
         x = self.dropout(x)
         output = self.fc(x)
