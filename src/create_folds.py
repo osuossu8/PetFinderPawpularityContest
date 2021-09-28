@@ -44,8 +44,9 @@ def create_folds(data, num_splits):
 df = pd.read_csv("input/train.csv")
 
 # create folds
-df = create_folds(df, num_splits=5)
+NUM_SPLITS = 10
+df = create_folds(df, num_splits=NUM_SPLITS)
 
 print(df.kfold.value_counts())
 
-df.to_csv("input/train_folds.csv", index=False)
+df.to_csv(f"input/train_folds_{NUM_SPLITS}.csv", index=False)

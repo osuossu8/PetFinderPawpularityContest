@@ -45,12 +45,12 @@ class CFG:
     ######################
     EXP_ID = '003'
     seed = 71
-    epochs = 3
-    folds = [0, 1, 2, 3, 4]
+    epochs = 20 # 3
+    folds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     N_FOLDS = 5
     LR = 1e-4
-    train_bs = 32
-    valid_bs = 32 * 2
+    train_bs = 16
+    valid_bs = 32
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "tf_efficientnet_b0_ns" # "tf_efficientnet_b1_ns"
@@ -60,7 +60,7 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 512 # 256 # 900
-    EARLY_STOPPING = False
+    EARLY_STOPPING = True
     APEX = False # True
     DEBUG = False # True
     FEATURE_COLS = [
@@ -72,22 +72,21 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            # A.HorizontalFlip(p=0.5),
-            # A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE),
-            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE),
-            A.RandomBrightnessContrast(p=0.2, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
-            A.HueSaturationValue(p=0.2, hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2),
-            A.ShiftScaleRotate(p=0.2, shift_limit=0.0625, scale_limit=0.2, rotate_limit=20),
-            # A.CoarseDropout(p=0.2),
-            A.Cutout(max_h_size=46, max_w_size=46, num_holes=5, p=0.5),
-            A.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
+            A.HueSaturationValue(
+                hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.5
+            ),
+            A.RandomBrightnessContrast(
+                brightness_limit=(-0.1, 0.1), contrast_limit=(-0.1, 0.1), p=0.5
+            ),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
             T.ToTensorV2()
-        ]),
+        ], p=1.0),
         'valid' : A.Compose([
-            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE),
-            A.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
             T.ToTensorV2()
-        ]),    
+        ], p=1.0),    
     }
 
 
@@ -419,7 +418,8 @@ for fold in range(5):
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-6, T_max=CFG.epochs)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-6, T_max=CFG.epochs)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=1e-6, last_epoch=-1)
 
     # ====================================================
     # apex
