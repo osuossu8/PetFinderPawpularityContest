@@ -49,9 +49,9 @@ class CFG:
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-4
-    train_bs = 64
-    valid_bs = 64 * 2
-    train_root = 'input/train/' # 'input/train_npy/'
+    train_bs = 32
+    valid_bs = 32 * 2
+    train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "tf_efficientnet_b0_ns" # "tf_efficientnet_b1_ns"
     in_chans = 3
@@ -139,10 +139,8 @@ class Pet2Dataset:
 
     def __getitem__(self, item):
         if self.y is not None:
-            path = CFG.train_root + self.X[item] + '.jpg'
-            # features = np.load(path, allow_pickle=True)
-            features = cv2.imread(path)
-            features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
+            path = CFG.train_root + self.X[item] + '.npy'
+            features = np.load(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
             targets = self.y[item]
@@ -154,10 +152,8 @@ class Pet2Dataset:
             }
           
         else:
-            path = CFG.test_root + self.X[item] + '.jpg'
-            # features = np.load(path, allow_pickle=True)
-            features = cv2.imread(path)
-            features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
+            path = CFG.test_root + self.X[item] + '.npy'
+            features = np.load(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['valid'](image=features)['image']
 
