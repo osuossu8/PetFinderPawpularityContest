@@ -45,12 +45,12 @@ class CFG:
     ######################
     EXP_ID = '003'
     seed = 71
-    epochs = 20 # 3
-    folds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    epochs = 20
+    folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-4
-    train_bs = 16
-    valid_bs = 32
+    train_bs = 64 # 16
+    valid_bs = 128 # 32
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "tf_efficientnet_b0_ns" # "tf_efficientnet_b1_ns"
@@ -59,7 +59,7 @@ class CFG:
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
-    IMG_SIZE = 512 # 256 # 900
+    IMG_SIZE = 256 # 512 # 256 # 900
     EARLY_STOPPING = True
     APEX = False # True
     DEBUG = False # True
@@ -80,12 +80,12 @@ CFG.get_transforms = {
                 brightness_limit=(-0.1, 0.1), contrast_limit=(-0.1, 0.1), p=0.5
             ),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
-            T.ToTensorV2()
+            # T.ToTensorV2()
         ], p=1.0),
         'valid' : A.Compose([
             A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
-            T.ToTensorV2()
+            # T.ToTensorV2()
         ], p=1.0),    
     }
 
@@ -142,6 +142,7 @@ class Pet2Dataset:
             features = np.load(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
+            features = np.transpose(features, (2, 0, 1)).astype(np.float32)
             targets = self.y[item]
        
             return {
@@ -155,6 +156,7 @@ class Pet2Dataset:
             features = np.load(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['valid'](image=features)['image']
+            features = np.transpose(features, (2, 0, 1)).astype(np.float32)
 
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
@@ -196,25 +198,25 @@ class Pet2Model(nn.Module):
         self.net.classifier = nn.Linear(self.net.classifier.in_features, 128)
         self.dropout = nn.Dropout(0.1)
 
-        self.process_meta = nn.Sequential(
-            nn.Linear(12, 8),
-            nn.BatchNorm1d(8),
-            nn.PReLU(),
-            nn.Dropout(0.1),
-        )
+        # self.process_meta = nn.Sequential(
+        #     nn.Linear(12, 8),
+        #     nn.BatchNorm1d(8),
+        #     nn.PReLU(),
+        #     nn.Dropout(0.1),
+        # )
         
-        self.fc = nn.Linear(128 + 8, CFG.TARGET_DIM, bias=True)
-        self.init_weight()
+        self.fc = nn.Linear(128 + 12, CFG.TARGET_DIM, bias=True)
+        # self.init_weight()
         
-    def init_weight(self):
-        init_layer(self.fc)
+    # def init_weight(self):
+    #     init_layer(self.fc)
 
     def forward(self, features, metas):
         x = self.net(features)
         x = self.dropout(x)
 
-        meta = self.process_meta(metas)
-        x = torch.cat([x, meta], 1)
+        # meta = self.process_meta(metas)
+        x = torch.cat([x, metas], 1)
         output = self.fc(x)
         return output
 
@@ -332,7 +334,7 @@ def calc_cv(model_paths):
         model.eval()
         models.append(model)
     
-    df = pd.read_csv("input/train_folds.csv")
+    df = pd.read_csv("input/train_folds_5.csv")
 
     idx = []
     y_true = []
@@ -384,7 +386,7 @@ set_seed(CFG.seed)
 device = get_device()
 
 # data
-train = pd.read_csv("input/train_folds.csv")
+train = pd.read_csv("input/train_folds_5.csv")
 
 print(train.shape)
 train.head()
@@ -460,17 +462,10 @@ for fold in range(5):
                 logger.info(f'Early Stopping')
                 break
 
-
 if len(CFG.folds) == 1:
     pass
 else:
-    model_paths = [
-        f'output/{CFG.EXP_ID}/fold-0.bin', 
-        f'output/{CFG.EXP_ID}/fold-1.bin', 
-        f'output/{CFG.EXP_ID}/fold-2.bin', 
-        f'output/{CFG.EXP_ID}/fold-3.bin',
-        f'output/{CFG.EXP_ID}/fold-4.bin',
-    ]
+    model_paths = [f'output/{CFG.EXP_ID}/fold-{i}.bin' for i in CFG.folds]
 
     calc_cv(model_paths)
     print('calc cv finished!!')

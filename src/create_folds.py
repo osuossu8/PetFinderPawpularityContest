@@ -13,7 +13,7 @@ def create_folds(data, num_splits):
     data["kfold"] = -1
     
     # the next step is to randomize the rows of the data
-    data = data.sample(frac=1).reset_index(drop=True)
+    # data = data.sample(frac=1).reset_index(drop=True)
 
     # calculate number of bins by Sturge's rule
     # I take the floor of the value, you can also
@@ -26,7 +26,7 @@ def create_folds(data, num_splits):
     )
     
     # initiate the kfold class from model_selection module
-    kf = model_selection.StratifiedKFold(n_splits=num_splits)
+    kf = model_selection.StratifiedKFold(n_splits=num_splits, shuffle=True, random_state=42)
     
     # fill the new kfold column
     # note that, instead of targets, we use bins!
