@@ -28,6 +28,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealin
 
 from pathlib import Path
 from typing import List
+from PIL import Image
 
 from sklearn import model_selection
 from sklearn import metrics
@@ -70,7 +71,6 @@ class CFG:
         'Info', 'Blur',
     ]
 
-"""
 CFG.get_transforms = {
         'train' : A.Compose([
             A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
@@ -88,28 +88,6 @@ CFG.get_transforms = {
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
             # T.ToTensorV2()
         ], p=1.0),    
-    }
-"""
-
-IMAGENET_MEAN = [0.485, 0.456, 0.406]  # RGB
-IMAGENET_STD = [0.229, 0.224, 0.225]  # RGB
-CFG.get_transforms = {
-        "train": T.Compose(
-            [
-                T.RandomHorizontalFlip(),
-                T.RandomVerticalFlip(),
-                T.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
-                T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
-                T.ConvertImageDtype(torch.float),
-                T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-            ]
-        ),
-        "valid": T.Compose(
-            [
-                T.ConvertImageDtype(torch.float),
-                T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-            ]
-        ),
     }
 
 def set_seed(seed=42):
@@ -216,19 +194,32 @@ class Pet2Model(nn.Module):
         super(Pet2Model, self).__init__()    
         
         # Model Encoder
-        self.net = timm.create_model(model_name, pretrained=True, in_chans=CFG.in_chans)
-        self.net.classifier = nn.Linear(self.net.classifier.in_features, 128)
+        self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
+        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_base_patch4_window7_224_22kto1k.pth'
+        if pretrained_model_path:
+            state_dict = dict()
+            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
+                if k[:6] == "model.":
+                    k = k.replace("model.", "")
+                if k == 'head.weight':
+                    continue
+                if k == 'head.bias':
+                    continue
+                state_dict[k] = v
+            self.model.load_state_dict(state_dict)
+            print("loaded pretrained weight")
+        self.l0 = nn.Linear(self.model.num_features, 128)
         self.dropout = nn.Dropout(0.5)
 
         self.fc = nn.Linear(128 + 12, CFG.TARGET_DIM, bias=True)
 
     def forward(self, features, metas):
-        x = self.net(features)
+        x = self.model(features)
         x = self.dropout(x)
-
+        x = self.l0(x)
         x = torch.cat([x, metas], 1)
         output = self.fc(x)
-        return torch.sigmoid(output) * 100
+        return output # (torch.sigmoid(output) * 100).squeeze(-1)
 
 
 # ====================================================
@@ -286,6 +277,8 @@ class RMSELoss(torch.nn.Module):
 
 def loss_fn(logits, targets):
     # loss_fct = RMSELoss()
+    # logits = (torch.sigmoid(output) * 100.).squeeze(-1)
+    # targets = targets / 100.
     loss_fct = nn.BCEWithLogitsLoss()
     loss = loss_fct(logits, targets)
     return loss
@@ -303,6 +296,8 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         targets = data['y'].to(device)
         metas = data['meta'].to(device)
         outputs = model(inputs, metas)
+        outputs = output.squeeze(-1)
+        targets = targets / 100.0
         loss = loss_fn(outputs, targets)
         if CFG.APEX:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -312,6 +307,8 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         optimizer.step()
         scheduler.step()
         losses.update(loss.item(), inputs.size(0))
+        outputs = torch.sigmoid(outputs) * 100.
+        targets = targets * 100.
         scores.update(targets, outputs)
         tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
@@ -329,8 +326,12 @@ def valid_fn(model, data_loader, device):
             targets = data['y'].to(device)
             metas = data['meta'].to(device)
             outputs = model(inputs, metas)
+            outputs = output.squeeze(-1)
+            targets = targets / 100.0
             loss = loss_fn(outputs, targets)
             losses.update(loss.item(), inputs.size(0))
+            outputs = torch.sigmoid(outputs) * 100.
+            targets = targets * 100.
             scores.update(targets, outputs)
             tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
@@ -365,6 +366,7 @@ def calc_cv(model_paths):
                 targets = data['y'].to(device)
                 metas = data['meta'].to(device)
                 output = model(inputs, metas)
+                output = torch.sigmoid(output) * 100.
                 output = output.detach().cpu().numpy().tolist()
                 final_output.extend(output)
         y_pred.append(np.array(final_output))
