@@ -277,8 +277,6 @@ class RMSELoss(torch.nn.Module):
 
 def loss_fn(logits, targets):
     # loss_fct = RMSELoss()
-    # logits = (torch.sigmoid(output) * 100.).squeeze(-1)
-    # targets = targets / 100.
     loss_fct = nn.BCEWithLogitsLoss()
     loss = loss_fct(logits, targets)
     return loss
@@ -296,7 +294,7 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         targets = data['y'].to(device)
         metas = data['meta'].to(device)
         outputs = model(inputs, metas)
-        outputs = output.squeeze(-1)
+        outputs = outputs.squeeze(-1)
         targets = targets / 100.0
         loss = loss_fn(outputs, targets)
         if CFG.APEX:
@@ -326,7 +324,7 @@ def valid_fn(model, data_loader, device):
             targets = data['y'].to(device)
             metas = data['meta'].to(device)
             outputs = model(inputs, metas)
-            outputs = output.squeeze(-1)
+            outputs = outputs.squeeze(-1)
             targets = targets / 100.0
             loss = loss_fn(outputs, targets)
             losses.update(loss.item(), inputs.size(0))
