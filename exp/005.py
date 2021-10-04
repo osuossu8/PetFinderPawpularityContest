@@ -140,10 +140,9 @@ class Pet2Dataset:
         if self.y is not None:
             # path = CFG.train_root + self.X[item] + '.npy'
             # features = np.load(path)
+            path = 'input/train_cropped/crop/' + self.X[item] + '.jpg'
             features = cv2.imread(path)
             features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
-            path = 'input/train_cropped/crop/' + self.X[item] + '.jpg'
-            features 
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
             features = np.transpose(features, (2, 0, 1)).astype(np.float32)
