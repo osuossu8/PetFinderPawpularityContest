@@ -51,7 +51,7 @@ class CFG:
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-4
-    train_bs = 16
+    train_bs = 32 # 16
     valid_bs = 32
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
@@ -329,19 +329,19 @@ def train_mixup_fn(model, data_loader, device, optimizer, scheduler):
             inputs, new_targets = mixup(inputs, targets, 0.4)
             outputs = model(inputs, metas)
             outputs = outputs.squeeze(-1)
-            targets = targets / 100.0
+            new_targets = new_targets / 100.0
             loss = mixup_criterion(outputs, new_targets)
         else:
             outputs = model(inputs, metas)
             outputs = outputs.squeeze(-1)
-            targets = targets / 100.0
+            new_targets = targets / 100.0
             loss = loss_fn(outputs, targets)
         loss.backward()
         optimizer.step()
         scheduler.step()
         losses.update(loss.item(), inputs.size(0))
         outputs = torch.sigmoid(outputs) * 100.
-        targets = targets * 100.
+        new_targets = new_targets * 100.
         scores.update(new_targets[0], outputs)
         tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
