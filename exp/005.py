@@ -329,20 +329,27 @@ def train_mixup_fn(model, data_loader, device, optimizer, scheduler):
             inputs, new_targets = mixup(inputs, targets, 0.4)
             outputs = model(inputs, metas)
             outputs = outputs.squeeze(-1)
-            new_targets = new_targets / 100.0
+            new_targets = [new_targets[0] / 100.0, new_targets[1] / 100.0, new_targets[2]]
             loss = mixup_criterion(outputs, new_targets)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            losses.update(loss.item(), inputs.size(0))
+            outputs = torch.sigmoid(outputs) * 100.
+            new_targets = [new_targets[0] * 100.0, new_targets[1] * 100.0, new_targets[2]]
+            scores.update(new_targets[0], outputs)
         else:
             outputs = model(inputs, metas)
             outputs = outputs.squeeze(-1)
-            new_targets = targets / 100.0
+            new_targets = targets / 100.
             loss = loss_fn(outputs, targets)
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-        losses.update(loss.item(), inputs.size(0))
-        outputs = torch.sigmoid(outputs) * 100.
-        new_targets = new_targets * 100.
-        scores.update(new_targets[0], outputs)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            losses.update(loss.item(), inputs.size(0))
+            outputs = torch.sigmoid(outputs) * 100.
+            targets = targets * 100.
+            scores.update(targets, outputs)
         tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
 
