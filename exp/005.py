@@ -142,7 +142,7 @@ class Pet2Dataset:
             # features = np.load(path)
             features = cv2.imread(path)
             features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
-            path = 'input/train_cropped/crop/' + self.X[item] + '.npy'
+            path = 'input/train_cropped/crop/' + self.X[item] + '.jpg'
             features 
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
