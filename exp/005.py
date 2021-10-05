@@ -493,10 +493,10 @@ for fold in range(5):
 
         start_time = time.time()
 
-        if epoch < 1:
-            train_avg, train_loss = train_mixup_fn(model, train_dataloader, device, optimizer, scheduler)
-        else:
-            train_avg, train_loss = train_fn(model, train_dataloader, device, optimizer, scheduler)
+        #if epoch < 1:
+        #    train_avg, train_loss = train_mixup_fn(model, train_dataloader, device, optimizer, scheduler)
+        #else:
+        train_avg, train_loss = train_fn(model, train_dataloader, device, optimizer, scheduler)
 
         valid_avg, valid_loss = valid_fn(model, valid_dataloader, device)
         scheduler.step()
