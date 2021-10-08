@@ -194,7 +194,7 @@ class Pet2Model(nn.Module):
                 state_dict[k] = v
             self.model.load_state_dict(state_dict)
             print("loaded pretrained weight")
-        self.model.head = nn.Linear(self.model.head.in_features, 128)
+        self.model.head = nn.Linear(self.model.num_features, 128)
         self.dropout = nn.Dropout(0.1)
         self.dense1 = nn.Linear(140, 64)
         self.dense2 = nn.Linear(64, CFG.TARGET_DIM)
@@ -205,7 +205,7 @@ class Pet2Model(nn.Module):
         x = torch.cat([x, metas], 1)
         x = self.dense1(x)
         x = torch.relu(x)
-        x = self.dense2(x)
+        output = self.dense2(x)
         return output
 
 
