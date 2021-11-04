@@ -73,10 +73,8 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.Compose([
-                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
-            ], p=1.0),
+            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.HueSaturationValue(
