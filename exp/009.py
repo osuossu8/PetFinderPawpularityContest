@@ -73,7 +73,10 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
+            A.Compose([
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
+            ], p=1.0),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.HueSaturationValue(
@@ -518,7 +521,7 @@ for fold in range(5):
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-    patience = 2 # 1 # 3
+    patience = 5 # 2 # 1 # 3
     p = 0
     min_loss = 999
     best_score = np.inf
