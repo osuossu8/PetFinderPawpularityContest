@@ -518,7 +518,7 @@ for fold in range(5):
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-    patience = 1 # 3
+    patience = 2 # 1 # 3
     p = 0
     min_loss = 999
     best_score = np.inf
