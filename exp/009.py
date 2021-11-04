@@ -73,10 +73,10 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
-            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
+            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1, scale=(0.9, 1.0),
+            # A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
+            # A.VerticalFlip(p=0.5),
             A.HueSaturationValue(
                 hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.5
             ),
@@ -205,7 +205,7 @@ class Pet2Model(nn.Module):
         x = self.dropout(x)
         x = torch.cat([x, metas], 1)
         x = self.dense1(x)
-        x = torch.relu(x)
+        # x = torch.relu(x)
         output = self.dense2(x)
         return output
 
@@ -260,6 +260,36 @@ class RMSELoss(torch.nn.Module):
     def forward(self,x,y):
         criterion = nn.MSELoss()
         loss = torch.sqrt(criterion(x, y))
+        return loss
+
+
+from torch.nn.modules.loss import _WeightedLoss
+import torch.nn.functional as F
+
+class SmoothBCEwLogits(_WeightedLoss):
+    def __init__(self, weight=None, reduction='mean', smoothing=0.0):
+        super().__init__(weight=weight, reduction=reduction)
+        self.smoothing = smoothing
+        self.weight = weight
+        self.reduction = reduction
+
+    @staticmethod
+    def _smooth(targets:torch.Tensor, n_labels:int, smoothing=0.0):
+        assert 0 <= smoothing < 1
+        with torch.no_grad():
+            targets = targets * (1.0 - smoothing) + 0.5 * smoothing
+        return targets
+
+    def forward(self, inputs, targets):
+        targets = SmoothBCEwLogits._smooth(targets, inputs.size(-1),
+            self.smoothing)
+        loss = F.binary_cross_entropy_with_logits(inputs, targets,self.weight)
+
+        if  self.reduction == 'sum':
+            loss = loss.sum()
+        elif  self.reduction == 'mean':
+            loss = loss.mean()
+
         return loss
 
 
@@ -321,7 +351,8 @@ def cutmix_criterion(preds, new_targets):
 
 
 def loss_fn(logits, targets):
-    loss_fct = nn.BCEWithLogitsLoss()
+    # loss_fct = nn.BCEWithLogitsLoss()
+    loss_fct = SmoothBCEwLogits(smoothing=0.0005)
     loss = loss_fct(logits, targets)
     return loss
 
@@ -519,7 +550,7 @@ for fold in range(5):
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-    patience = 5 # 2 # 1 # 3
+    patience = 3 # 2 # 1 # 3
     p = 0
     min_loss = 999
     best_score = np.inf
