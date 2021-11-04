@@ -51,8 +51,8 @@ class CFG:
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 1e-4
-    train_bs = 32
-    valid_bs = 64
+    train_bs = 8 # 32
+    valid_bs = 16 # 64
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
