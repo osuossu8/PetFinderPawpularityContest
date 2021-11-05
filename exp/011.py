@@ -78,7 +78,7 @@ CFG.get_transforms = {
                 A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
             ], p=1.0),
             A.HorizontalFlip(p=0.5),
-            A.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+            A.Affine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
             A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),
