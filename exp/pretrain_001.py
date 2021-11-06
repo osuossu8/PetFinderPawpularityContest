@@ -423,7 +423,7 @@ def calc_cv(model_paths):
     
     df = pd.read_csv("input/train_folds_5.csv")
 
-    df = pd.read_csv("input/petfinder1_dataset_exist_image_path_with_pred_meta_data.csv").iloc[:14993]
+    df = pd.read_csv("input/petfinder1_dataset_exist_image_path_with_pred_meta_data.csv").iloc[:-3858]
     df['Pawpularity'] = 20 * ((4 - df['AdoptionSpeed'])+1)
     df['ImagePath'] = df['PetID'].map(lambda x: f'input/train_images/{x}-1.jpg')
 
@@ -497,7 +497,7 @@ set_seed(CFG.seed)
 device = get_device()
 
 # data
-train = pd.read_csv("input/petfinder1_dataset_exist_image_path_with_pred_meta_data.csv").iloc[:14993]
+train = pd.read_csv("input/petfinder1_dataset_exist_image_path_with_pred_meta_data.csv").iloc[:-3858]
 train['Pawpularity'] = 20 * ((4 - train['AdoptionSpeed'])+1)
 train['ImagePath'] = train['PetID'].map(lambda x: f'input/train_images/{x}-1.jpg')
 
