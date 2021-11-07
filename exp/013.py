@@ -546,9 +546,8 @@ sims = ['13d215b4c71c3dc603cd13fc3ec80181_373c763f5218610e9b3f82b12ada8ae5',
        '87c6a8f85af93b84594a36f8ffd5d6b8_d050e78384bd8b20e7291b3efedf6a5b',
        '04201c5191c3b980ae307b20113c8853_16d8e12207ede187e65ab45d7def117b']
 similary_images = pd.Series(sims).str.extract(r"(?P<left>\w+)_(?P<right>\w+)")
-print(similary_images.shape)
-dups = similary_images[0].values.tolist()
-print(dups)
+dups = similary_images['left'].values.tolist()
+print(len(dups))
 
 print(train.shape)
 train.head()
