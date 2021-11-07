@@ -59,7 +59,7 @@ class CFG:
     in_chans = 3
     ID_COL = 'ImagePath' # 'Id'
     TARGET_COL = 'AdoptionSpeed' # 'Pawpularity'
-    TARGET_DIM = 5 # 1
+    TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 384 # 224 # 512 # 256 # 900
     EARLY_STOPPING = True
