@@ -73,20 +73,18 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
-            A.HueSaturationValue(
-                hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.5
-            ),
-            A.RandomBrightnessContrast(
-                brightness_limit=(-0.1, 0.1), contrast_limit=(-0.1, 0.1), p=0.5
-            ),
+            A.OneOf([
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5, scale=(0.85, 0.95)),
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
+            ], p=1.0),
+            A.HorizontalFlip(p=0.5),
+            A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
+            A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
-            # T.ToTensorV2()
         ], p=1.0),
         'valid' : A.Compose([
             A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
-            # T.ToTensorV2()
         ], p=1.0),    
     }
 
@@ -261,6 +259,37 @@ class RMSELoss(torch.nn.Module):
         return loss
 
 
+from torch.nn.modules.loss import _WeightedLoss
+import torch.nn.functional as F
+
+class SmoothBCEwLogits(_WeightedLoss):
+    def __init__(self, weight=None, reduction='mean', smoothing=0.0):
+        super().__init__(weight=weight, reduction=reduction)
+        self.smoothing = smoothing
+        self.weight = weight
+        self.reduction = reduction
+
+    @staticmethod
+    def _smooth(targets:torch.Tensor, n_labels:int, smoothing=0.0):
+        assert 0 <= smoothing < 1
+        with torch.no_grad():
+            targets = targets * (1.0 - smoothing) + 0.5 * smoothing
+        return targets
+
+    def forward(self, inputs, targets):
+        targets = SmoothBCEwLogits._smooth(targets, inputs.size(-1),
+            self.smoothing)
+        loss = F.binary_cross_entropy_with_logits(inputs, targets,self.weight)
+
+        if  self.reduction == 'sum':
+            loss = loss.sum()
+        elif  self.reduction == 'mean':
+            loss = loss.mean()
+
+        return loss
+
+
+
 def rand_bbox(size, lam):
     W = size[2]
     H = size[3]
@@ -308,18 +337,18 @@ def cutmix(data, targets, alpha):
 
 def mixup_criterion(preds, new_targets):
     targets1, targets2, lam = new_targets[0], new_targets[1], new_targets[2]
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = SmoothBCEwLogits(smoothing=0.001)
     return lam * criterion(preds, targets1) + (1 - lam) * criterion(preds, targets2)
 
 
 def cutmix_criterion(preds, new_targets):
     targets1, targets2, lam = new_targets[0], new_targets[1], new_targets[2]
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = SmoothBCEwLogits(smoothing=0.001)
     return lam * criterion(preds, targets1) + (1 - lam) * criterion(preds, targets2)
 
 
 def loss_fn(logits, targets):
-    loss_fct = nn.BCEWithLogitsLoss()
+    loss_fct = SmoothBCEwLogits(smoothing=0.001)
     loss = loss_fct(logits, targets)
     return loss
 
