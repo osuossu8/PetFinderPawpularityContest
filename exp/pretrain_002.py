@@ -348,7 +348,7 @@ def cutmix_criterion(preds, new_targets):
 
 
 def loss_fn(logits, targets):
-    loss_fct = SmoothBCEwLogits(smoothing=0.001)
+    loss_fct = RMSELoss() # SmoothBCEwLogits(smoothing=0.001)
     loss = loss_fct(logits, targets)
     return loss
 
@@ -476,7 +476,7 @@ def calc_cv(model_paths):
                 targets = data['y'].to(device)
                 metas = data['meta'].to(device)
                 output = model(inputs, metas)
-                output = torch.sigmoid(output) * 100.
+                output = torch.sigmoid(output) # * 100.
                 output = output.detach().cpu().numpy().tolist()
                 final_output.extend(output)
         y_pred.append(np.array(final_output))
