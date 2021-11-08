@@ -447,8 +447,8 @@ def valid_fn(model, data_loader, device):
 
 def calc_cv(model_paths):
     models = []
-    for model_path in model_paths:
-        model = Pet2Model(CFG.MODEL_NAME)
+    for fold, model_path in enumerate(model_paths):
+        model = Pet2Model(CFG.MODEL_NAME, fold)
         model.to(device)
         model.load_state_dict(torch.load(model_path))
         model.eval()
