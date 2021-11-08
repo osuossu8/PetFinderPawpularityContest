@@ -570,7 +570,7 @@ for fold in range(5):
     val_df = train[train.kfold == fold].reset_index(drop=True)
     print(val_df.shape)
     val_df = val_df[~val_df['Id'].isin(dups)].reset_index(drop=True)
-    print(trn_df.shape)
+    print(val_df.shape)
 
     if CFG.DEBUG:
         trn_df = trn_df.head(64)
