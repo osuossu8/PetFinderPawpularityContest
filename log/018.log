@@ -1,0 +1,116 @@
+========================================================================================================================
+Fold 0 Training
+========================================================================================================================
+Starting 1 epoch...
+Epoch 1 - avg_train_loss: 0.65822  avg_val_loss: 0.65028  time: 793s
+Epoch 1 - train_score:20.17996  valid_score:18.89638
+>>>>>>>> Model Improved From inf ----> 18.896384433181566
+Starting 2 epoch...
+Epoch 2 - avg_train_loss: 0.64558  avg_val_loss: 0.64856  time: 804s
+Epoch 2 - train_score:18.27625  valid_score:18.70431
+>>>>>>>> Model Improved From 18.896384433181566 ----> 18.704309642413346
+Starting 3 epoch...
+Epoch 3 - avg_train_loss: 0.63724  avg_val_loss: 0.64388  time: 802s
+Epoch 3 - train_score:17.15160  valid_score:18.10248
+>>>>>>>> Model Improved From 18.704309642413346 ----> 18.102482964689226
+Starting 4 epoch...
+Epoch 4 - avg_train_loss: 0.62662  avg_val_loss: 0.64531  time: 803s
+Epoch 4 - train_score:15.64933  valid_score:18.30596
+Starting 5 epoch...
+Epoch 5 - avg_train_loss: 0.61281  avg_val_loss: 0.64759  time: 802s
+Epoch 5 - train_score:13.54644  valid_score:18.48307
+Starting 6 epoch...
+Epoch 6 - avg_train_loss: 0.60352  avg_val_loss: 0.65336  time: 803s
+Epoch 6 - train_score:11.98090  valid_score:19.04734
+Early Stopping
+========================================================================================================================
+Fold 1 Training
+========================================================================================================================
+Starting 1 epoch...
+Epoch 1 - avg_train_loss: 0.65661  avg_val_loss: 0.64700  time: 802s
+Epoch 1 - train_score:19.97525  valid_score:18.42959
+>>>>>>>> Model Improved From inf ----> 18.429590993908807
+Starting 2 epoch...
+Epoch 2 - avg_train_loss: 0.64485  avg_val_loss: 0.64874  time: 801s
+Epoch 2 - train_score:18.18879  valid_score:18.66742
+Starting 3 epoch...
+Epoch 3 - avg_train_loss: 0.63599  avg_val_loss: 0.65160  time: 803s
+Epoch 3 - train_score:17.00950  valid_score:19.01396
+Starting 4 epoch...
+Epoch 4 - avg_train_loss: 0.62511  avg_val_loss: 0.65404  time: 803s
+Epoch 4 - train_score:15.45103  valid_score:19.10367
+Early Stopping
+========================================================================================================================
+Fold 2 Training
+========================================================================================================================
+Starting 1 epoch...
+Epoch 1 - avg_train_loss: 0.65748  avg_val_loss: 0.64733  time: 804s
+Epoch 1 - train_score:20.24032  valid_score:18.56160
+>>>>>>>> Model Improved From inf ----> 18.5615980556753
+Starting 2 epoch...
+Epoch 2 - avg_train_loss: 0.64461  avg_val_loss: 0.65066  time: 803s
+Epoch 2 - train_score:18.14514  valid_score:18.98726
+Starting 3 epoch...
+Epoch 3 - avg_train_loss: 0.63646  avg_val_loss: 0.64380  time: 803s
+Epoch 3 - train_score:17.05189  valid_score:18.07647
+>>>>>>>> Model Improved From 18.5615980556753 ----> 18.076472882627062
+Starting 4 epoch...
+Epoch 4 - avg_train_loss: 0.62573  avg_val_loss: 0.65077  time: 802s
+Epoch 4 - train_score:15.53494  valid_score:18.84892
+Starting 5 epoch...
+Epoch 5 - avg_train_loss: 0.61520  avg_val_loss: 0.65376  time: 803s
+Epoch 5 - train_score:13.96287  valid_score:19.17753
+Starting 6 epoch...
+Epoch 6 - avg_train_loss: 0.60412  avg_val_loss: 0.65590  time: 802s
+Epoch 6 - train_score:12.13034  valid_score:19.16685
+Early Stopping
+========================================================================================================================
+Fold 3 Training
+========================================================================================================================
+Starting 1 epoch...
+Epoch 1 - avg_train_loss: 0.65781  avg_val_loss: 0.65105  time: 803s
+Epoch 1 - train_score:20.07634  valid_score:18.96611
+>>>>>>>> Model Improved From inf ----> 18.966114143687815
+Starting 2 epoch...
+Epoch 2 - avg_train_loss: 0.64606  avg_val_loss: 0.64552  time: 803s
+Epoch 2 - train_score:18.35069  valid_score:18.25117
+>>>>>>>> Model Improved From 18.966114143687815 ----> 18.251167316108884
+Starting 3 epoch...
+Epoch 3 - avg_train_loss: 0.63724  avg_val_loss: 0.64279  time: 803s
+Epoch 3 - train_score:17.17784  valid_score:17.90655
+>>>>>>>> Model Improved From 18.251167316108884 ----> 17.90654977459913
+Starting 4 epoch...
+Epoch 4 - avg_train_loss: 0.62711  avg_val_loss: 0.65305  time: 803s
+Epoch 4 - train_score:15.75437  valid_score:19.10977
+Starting 5 epoch...
+Epoch 5 - avg_train_loss: 0.61502  avg_val_loss: 0.65001  time: 803s
+Epoch 5 - train_score:13.95767  valid_score:18.67007
+Starting 6 epoch...
+Epoch 6 - avg_train_loss: 0.60492  avg_val_loss: 0.65754  time: 805s
+Epoch 6 - train_score:12.28127  valid_score:19.16928
+Early Stopping
+========================================================================================================================
+Fold 4 Training
+========================================================================================================================
+Starting 1 epoch...
+Epoch 1 - avg_train_loss: 0.65630  avg_val_loss: 0.65194  time: 804s
+Epoch 1 - train_score:20.04803  valid_score:19.09352
+>>>>>>>> Model Improved From inf ----> 19.093519506233953
+Starting 2 epoch...
+Epoch 2 - avg_train_loss: 0.64513  avg_val_loss: 0.66174  time: 804s
+Epoch 2 - train_score:18.21147  valid_score:20.09493
+Starting 3 epoch...
+Epoch 3 - avg_train_loss: 0.63679  avg_val_loss: 0.64749  time: 803s
+Epoch 3 - train_score:17.10860  valid_score:18.51091
+>>>>>>>> Model Improved From 19.093519506233953 ----> 18.510910660520384
+Starting 4 epoch...
+Epoch 4 - avg_train_loss: 0.62755  avg_val_loss: 0.65081  time: 803s
+Epoch 4 - train_score:15.81133  valid_score:18.93221
+Starting 5 epoch...
+Epoch 5 - avg_train_loss: 0.61702  avg_val_loss: 0.66166  time: 803s
+Epoch 5 - train_score:14.23732  valid_score:19.99499
+Starting 6 epoch...
+Epoch 6 - avg_train_loss: 0.60544  avg_val_loss: 0.65710  time: 803s
+Epoch 6 - train_score:12.39409  valid_score:19.40418
+Early Stopping
+cv score 18.208864726026942
