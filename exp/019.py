@@ -148,7 +148,7 @@ class Pet2Dataset:
             features = np.transpose(features, (2, 0, 1)).astype(np.float32)
             targets = self.y[item]
             aux = self.aux_y[item]
-            aux_targets = np.zeros(12, dtype=float)
+            aux_targets = np.zeros(14, dtype=float)
             aux_targets[aux] = 1.0
 
             return {
