@@ -423,7 +423,7 @@ def valid_fn(model, data_loader, device):
             inputs = data['x'].to(device)
             targets = data['y'].to(device)
             metas = data['meta'].to(device)
-            outputs, meta_outs = model(inputs, metas)
+            outputs = model(inputs, metas)
             loss = loss_fn(outputs, targets / 100.0)
             losses.update(loss.item(), inputs.size(0))
             outputs = torch.sigmoid(outputs) * 100.
