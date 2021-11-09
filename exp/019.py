@@ -73,11 +73,10 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            # A.OneOf([
-            #     A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5, scale=(0.85, 0.95)),
-            #     A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
-            # ], p=1.0),
-            # A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0, scale=(0.7, 1.0)),
+            A.OneOf([
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5, scale=(0.85, 0.95)),
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
+            ], p=1.0),
             A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.HorizontalFlip(p=0.5),
             A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
@@ -128,9 +127,10 @@ def calc_loss(y_true, y_pred):
 
 
 class Pet2Dataset:
-    def __init__(self, X, y=None, Meta_features=None):
+    def __init__(self, X, y=None, aux_y=None, Meta_features=None):
         self.X = X
         self.y = y
+        self.aux_y = aux_y
         self.Meta_features = Meta_features
 
     def __len__(self):
@@ -147,10 +147,14 @@ class Pet2Dataset:
                 features = CFG.get_transforms['train'](image=features)['image']
             features = np.transpose(features, (2, 0, 1)).astype(np.float32)
             targets = self.y[item]
-       
+            aux = self.aux_y[item]
+            aux_targets = np.zeros(12, dtype=float)
+            aux_targets[aux] = 1.0
+
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
                 'y': torch.tensor(targets, dtype=torch.float32),
+                'aux_y' : torch.tensor(aux_targets, dtype=torch.float32),
                 'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
             }
           
@@ -195,18 +199,22 @@ class Pet2Model(nn.Module):
             self.model.load_state_dict(state_dict)
             print("loaded pretrained weight")
         self.model.head = nn.Linear(self.model.num_features, 128)
+        self.meta_head = nn.Linear(128, 12)
         self.dropout = nn.Dropout(0.1)
         self.dense1 = nn.Linear(140, 64)
         self.dense2 = nn.Linear(64, CFG.TARGET_DIM)
+        self.dense3 = nn.Linear(64, 14)
 
     def forward(self, features, metas):
         x = self.model(features)
         x = self.dropout(x)
+        pred_meta = self.meta_head(x)
         x = torch.cat([x, metas], 1)
         x = self.dense1(x)
         x = torch.relu(x)
         output = self.dense2(x)
-        return output
+        aux_out = self.dense3(x)
+        return output.squeeze(-1), torch.sigmoid(aux_out), torch.sigmoid(pred_meta)
 
 
 # ====================================================
@@ -311,21 +319,23 @@ def rand_bbox(size, lam):
     return bbx1, bby1, bbx2, bby2
 
 
-def mixup(data, targets, alpha):
+def mixup(data, targets, aux_targets, alpha):
     indices = torch.randperm(data.size(0))
     shuffled_data = data[indices]
     shuffled_targets = targets[indices]
+    shuffled_aux_targets = aux_targets[indices]
 
     lam = np.random.beta(alpha, alpha)
     new_data = data * lam + shuffled_data * (1 - lam)
-    new_targets = [targets, shuffled_targets, lam]
+    new_targets = [targets, shuffled_targets, lam, aux_targets, shuffled_aux_targets]
     return new_data, new_targets
 
 
-def cutmix(data, targets, alpha):
+def cutmix(data, targets, aux_targets, alpha):
     indices = torch.randperm(data.size(0))
     shuffled_data = data[indices]
     shuffled_targets = targets[indices]
+    shuffled_aux_targets = aux_targets[indices]
 
     lam = np.random.beta(alpha, alpha)
     bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
@@ -333,22 +343,22 @@ def cutmix(data, targets, alpha):
     # adjust lambda to exactly match pixel ratio
     lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.size()[-1] * data.size()[-2]))
 
-    new_targets = [targets, shuffled_targets, lam]
+    new_targets = [targets, shuffled_targets, lam, aux_targets, shuffled_aux_targets]
     return data, new_targets
 
 
 def mixup_criterion(preds, new_targets):
-    targets1, targets2, lam = new_targets[0], new_targets[1], new_targets[2]
-    # criterion = torch.nn.BCEWithLogitsLoss()
+    outs, auxs = preds[0], preds[1]
+    targets1, targets2, lam, aux_targets1, aux_targets2 = new_targets[0], new_targets[1], new_targets[2], new_targets[3], new_targets[4]
     criterion = SmoothBCEwLogits(smoothing=0.001)
-    return lam * criterion(preds, targets1) + (1 - lam) * criterion(preds, targets2)
+    return lam * criterion(outs, targets1) + (1 - lam) * criterion(outs, targets2) + lam * criterion(auxs, aux_targets1) + (1 - lam) * criterion(auxs, aux_targets2)
 
 
 def cutmix_criterion(preds, new_targets):
-    targets1, targets2, lam = new_targets[0], new_targets[1], new_targets[2]
-    # criterion = torch.nn.BCEWithLogitsLoss()
+    outs, auxs = preds[0], preds[1]
+    targets1, targets2, lam, aux_targets1, aux_targets2 = new_targets[0], new_targets[1], new_targets[2], new_targets[3], new_targets[4]
     criterion = SmoothBCEwLogits(smoothing=0.001)
-    return lam * criterion(preds, targets1) + (1 - lam) * criterion(preds, targets2)
+    return lam * criterion(outs, targets1) + (1 - lam) * criterion(outs, targets2) + lam * criterion(auxs, aux_targets1) + (1 - lam) * criterion(auxs, aux_targets2)
 
 
 def loss_fn(logits, targets):
@@ -368,11 +378,10 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         optimizer.zero_grad()
         inputs = data['x'].to(device)
         targets = data['y'].to(device)
+        aux_targets = data['aux_y'].to(device)
         metas = data['meta'].to(device)
-        outputs = model(inputs, metas)
-        outputs = outputs.squeeze(-1)
-        targets = targets / 100.0
-        loss = loss_fn(outputs, targets)
+        outputs, aux_outs, meta_outs = model(inputs, metas)
+        loss = (loss_fn(outputs, targets / 100.0) + loss_fn(aux_outs, aux_targets) + loss_fn(meta_outs, metas)) / 3
         if CFG.APEX:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
@@ -382,7 +391,6 @@ def train_fn(model, data_loader, device, optimizer, scheduler):
         scheduler.step()
         losses.update(loss.item(), inputs.size(0))
         outputs = torch.sigmoid(outputs) * 100.
-        targets = targets * 100.
         scores.update(targets, outputs)
         tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
@@ -398,26 +406,22 @@ def train_mixup_cutmix_fn(model, data_loader, device, optimizer, scheduler):
         optimizer.zero_grad()
         inputs = data['x'].to(device)
         targets = data['y'].to(device)
+        aux_targets = data['aux_y'].to(device)
         metas = data['meta'].to(device)
         if np.random.rand()<0.5:
-            inputs, new_targets = mixup(inputs, targets, 0.4)
-            outputs = model(inputs, metas)
-            outputs = outputs.squeeze(-1)
-            new_targets = [new_targets[0] / 100.0, new_targets[1] / 100.0, new_targets[2]]
-            loss = mixup_criterion(outputs, new_targets) 
+            inputs, new_targets = mixup(inputs, targets, aux_targets, 0.4)
+            outputs, aux_outs, meta_outs = model(inputs, metas)
+            loss = (mixup_criterion([outputs, aux_outs], [new_targets[0] / 100.0, new_targets[1] / 100.0, new_targets[2], new_targets[3], new_targets[4]]) + loss_fn(meta_outs, metas))/3
         else:
-            inputs, new_targets = cutmix(inputs, targets, 0.4)
-            outputs = model(inputs, metas)
-            outputs = outputs.squeeze(-1)
-            new_targets = [new_targets[0] / 100.0, new_targets[1] / 100.0, new_targets[2]]
-            loss = cutmix_criterion(outputs, new_targets)
+            inputs, new_targets = cutmix(inputs, targets, aux_targets, 0.4)
+            outputs, aux_outs, meta_outs = model(inputs, metas)
+            loss = (cutmix_criterion([outputs, aux_outs], [new_targets[0] / 100.0, new_targets[1] / 100.0, new_targets[2], new_targets[3], new_targets[4]]) + loss_fn(meta_outs, metas))/3
 
         loss.backward()
         optimizer.step()
         scheduler.step()
         losses.update(loss.item(), inputs.size(0))
         outputs = torch.sigmoid(outputs) * 100.
-        new_targets = [new_targets[0] * 100.0, new_targets[1] * 100.0, new_targets[2]]
         scores.update(new_targets[0], outputs)
         tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
@@ -433,14 +437,12 @@ def valid_fn(model, data_loader, device):
         for data in tk0:
             inputs = data['x'].to(device)
             targets = data['y'].to(device)
+            aux_targets = data['aux_y'].to(device)
             metas = data['meta'].to(device)
-            outputs = model(inputs, metas)
-            outputs = outputs.squeeze(-1)
-            targets = targets / 100.0
-            loss = loss_fn(outputs, targets)
+            outputs, aux_outs, meta_outs = model(inputs, metas)
+            loss = (loss_fn(outputs, targets / 100.0) + loss_fn(aux_outs, aux_targets) + loss_fn(meta_outs, metas)) / 3
             losses.update(loss.item(), inputs.size(0))
             outputs = torch.sigmoid(outputs) * 100.
-            targets = targets * 100.
             scores.update(targets, outputs)
             tk0.set_postfix(loss=losses.avg)
     return scores.avg, losses.avg
@@ -456,6 +458,8 @@ def calc_cv(model_paths):
         models.append(model)
     
     df = pd.read_csv("input/train_folds_5.csv")
+    num_bins = int(np.floor(1 + np.log2(len(df)))) # 14
+    df.loc[:,'aux_target'] = pd.cut(df[CFG.TARGET_COL],bins=num_bins,labels=False)
 
     idx = []
     y_true = []
@@ -463,7 +467,7 @@ def calc_cv(model_paths):
     for fold, model in enumerate(models):
         val_df = df[df.kfold == fold].reset_index(drop=True)
     
-        dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+        dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, aux_y=val_df['aux_target'].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
         data_loader = torch.utils.data.DataLoader(
             dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
         )
@@ -474,7 +478,7 @@ def calc_cv(model_paths):
                 inputs = data['x'].to(device)
                 targets = data['y'].to(device)
                 metas = data['meta'].to(device)
-                output = model(inputs, metas)
+                output, _, _ = model(inputs, metas)
                 output = torch.sigmoid(output) * 100.
                 output = output.detach().cpu().numpy().tolist()
                 final_output.extend(output)
@@ -510,6 +514,9 @@ device = get_device()
 # data
 train = pd.read_csv("input/train_folds_5.csv")
 
+num_bins = int(np.floor(1 + np.log2(len(train)))) # 14
+train.loc[:,'aux_target'] = pd.cut(train[CFG.TARGET_COL],bins=num_bins,labels=False)
+
 print(train.shape)
 train.head()
 
@@ -528,20 +535,18 @@ for fold in range(5):
         trn_df = trn_df.head(64)
         val_df = val_df.head(16)
 
-    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values, Meta_features=trn_df[CFG.FEATURE_COLS].values)
+    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values, aux_y=trn_df['aux_target'].values, Meta_features=trn_df[CFG.FEATURE_COLS].values)
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=CFG.train_bs, num_workers=0, pin_memory=True, shuffle=True
     )
     
-    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, aux_y=val_df['aux_target'].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
     )
  
     model = Pet2Model(CFG.MODEL_NAME)   
     model = model.to(device)
-    model.load_state_dict(torch.load(f'output/018/fold-{fold}.bin'))
-    print('1st stage model loaded')
 
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-6, T_max=CFG.epochs)
@@ -553,7 +558,7 @@ for fold in range(5):
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-    patience = 2 # 3 # 1
+    patience = 3 # 1
     p = 0
     min_loss = 999
     best_score = np.inf
