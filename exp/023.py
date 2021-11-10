@@ -74,8 +74,12 @@ class CFG:
 CFG.get_transforms = {
         'train' : A.Compose([
             A.OneOf([
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5, scale=(0.5, 0.9)),
-                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.5),
+                A.Compose([
+                    A.CenterCrop(256, 256, p=1.0),
+                    A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0),
+                ], p=0.3),
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.3, scale=(0.85, 0.95)),
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4),
             ], p=1.0),
             A.HorizontalFlip(p=0.5),
             A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
@@ -194,12 +198,16 @@ class Pet2Model(nn.Module):
             print("loaded pretrained weight")
         self.model.head = nn.Linear(self.model.num_features, 128)
         self.dropout = nn.Dropout(0.1)
-        self.dense = nn.Linear(128, CFG.TARGET_DIM)
+        self.dense1 = nn.Linear(140, 64)
+        self.dense2 = nn.Linear(64, CFG.TARGET_DIM)
 
     def forward(self, features, metas):
         x = self.model(features)
         x = self.dropout(x)
-        output = self.dense(x)
+        x = torch.cat([x, metas], 1)
+        x = self.dense1(x)
+        x = torch.relu(x)
+        output = self.dense2(x)
         return output.squeeze(-1)
 
 
