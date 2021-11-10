@@ -75,6 +75,7 @@ CFG.get_transforms = {
         'train' : A.Compose([
             A.OneOf([
                 A.Compose([
+                    A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0),
                     A.CenterCrop(256, 256, p=1.0),
                     A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0),
                 ], p=0.3),
