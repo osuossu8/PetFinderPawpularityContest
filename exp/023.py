@@ -50,7 +50,8 @@ class CFG:
     epochs = 20
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
-    LR = 1e-4
+    LR = 2e-5 # 1e-4
+    ETA_MIN = 7e-6 # 1e-5
     train_bs = 8 # 32
     valid_bs = 16 # 64
     train_root = 'input/train_npy/' # 'input/train_npy/'
@@ -74,14 +75,9 @@ class CFG:
 CFG.get_transforms = {
         'train' : A.Compose([
             A.OneOf([
-                A.Compose([
-                    A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0),
-                    A.CenterCrop(256, 256, p=1.0),
-                    A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0),
-                ], p=0.3),
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.3),
-                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4),
-            ], p=1.0),
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4, scale=(0.75, 0.95)),
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
+            ], p=1.0),            
             A.HorizontalFlip(p=0.5),
             A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
             A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
@@ -532,7 +528,7 @@ for fold in range(5):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=1e-6, T_max=CFG.epochs)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, T_mult=1, eta_min=1e-5, last_epoch=-1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, T_mult=1, eta_min=CFG.ETA_MIN, last_epoch=-1)
 
     # ====================================================
     # apex
@@ -540,7 +536,7 @@ for fold in range(5):
     if CFG.APEX:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-    patience = 3 # 2 # 1
+    patience = 5 # 2 # 1
     p = 0
     min_loss = 999
     best_score = np.inf
