@@ -79,7 +79,7 @@ CFG.get_transforms = {
                     A.CenterCrop(256, 256, p=1.0),
                     A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0),
                 ], p=0.3),
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.3, scale=(0.85, 0.95)),
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.3),
                 A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4),
             ], p=1.0),
             A.HorizontalFlip(p=0.5),
