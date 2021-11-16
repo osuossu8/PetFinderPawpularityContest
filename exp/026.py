@@ -205,7 +205,7 @@ class Pet2Model(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.dense1 = nn.Linear(140, 64)
         self.dense2 = nn.Linear(64, CFG.TARGET_DIM)
-        self.dense3 = nn.Linear(64, 10)
+        self.dense3 = nn.Linear(64, 11)
 
     def forward(self, features, metas):
         x = self.model(features)
