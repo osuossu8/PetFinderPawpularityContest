@@ -194,7 +194,8 @@ class Pet2Model(nn.Module):
             self.model.load_state_dict(state_dict)
             print("loaded pretrained weight")
         self.model.head = nn.Linear(self.model.num_features, 128)
-        self.dropout = nn.Dropout(0.1)
+        # self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(0.25)
         self.dense1 = nn.Linear(140, 64)
         self.dense2 = nn.Linear(64, CFG.TARGET_DIM)
 
