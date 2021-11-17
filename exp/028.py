@@ -438,7 +438,7 @@ def train_mixup_fn(model, data_loader, device, optimizer, scheduler):
         outputs = torch.sigmoid(outputs) * 100.
         scores.update(new_targets[0], outputs)
         tk0.set_postfix(loss=losses.avg)
-    return scores.avg, losses.
+    return scores.avg, losses.avg
 
 
 def valid_fn(model, data_loader, device):
