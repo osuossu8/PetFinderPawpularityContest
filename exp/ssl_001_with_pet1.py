@@ -268,7 +268,7 @@ for epoch in range(CFG.epochs):
 
     if train_loss < min_loss:
         logger.info(f">>>>>>>> Model Improved From {min_loss} ----> {train_loss}")
-        torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
+        torch.save(model.state_dict(), OUTPUT_DIR+f'ssl_model.bin')
         min_loss = train_loss
         p = 0
 
