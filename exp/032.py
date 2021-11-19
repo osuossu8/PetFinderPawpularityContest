@@ -58,7 +58,7 @@ class CFG:
     test_root = 'input/test/'
     MODEL_NAME = "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
     in_chans = 3
-    ID_COL = 'Id'
+    ID_COL = 'ImagePath' # 'Id'
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
@@ -232,7 +232,8 @@ warnings.filterwarnings("ignore")
 logger = init_logger(log_file=Path("log") / f"{CFG.EXP_ID}.log")
 
 # data
-train = pd.read_csv("input/train_folds_5.csv")
+train = pd.read_csv("input/petfinder1_dataset_exist_image_path_with_pred_meta_data.csv").iloc[:-3858]
+train['ImagePath'] = train['PetID'].map(lambda x: f'input/train_images/{x}-1.jpg')
 
 print(train.shape)
 train.head()
