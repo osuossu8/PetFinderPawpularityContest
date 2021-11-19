@@ -114,7 +114,7 @@ class SimSiamDataset:
         return len(self.X)
 
     def __getitem__(self, item):
-        path = CFG.train_root + self.X[item] + '.npy'
+        path = CFG.train_root + self.X[item]
         features = np.load(path)
         if CFG.get_transforms:
             features1 = CFG.get_transforms['train'](image=features)['image']
@@ -135,7 +135,7 @@ class SimSiam(nn.Module):
         super(SimSiam, self).__init__()    
         
         # Model Encoder
-        self.encoder = timm.create_model(model_name, pretrained=False, num_classes=dim, in_chans=CFG.in_chans)
+        self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
         pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window12_384_22kto1k.pth'
         if pretrained_model_path:
             state_dict = dict()
@@ -147,19 +147,19 @@ class SimSiam(nn.Module):
                 if k == 'head.bias':
                     continue
                 state_dict[k] = v
-            self.encoder.load_state_dict(state_dict)
+            self.model.load_state_dict(state_dict)
             print("loaded pretrained weight")
 
-        prev_dim = self.encoder.num_features
-        self.encoder.head = nn.Sequential(nn.Linear(prev_dim, prev_dim, bias=False),
+        prev_dim = self.model.num_features
+        self.model.head = nn.Sequential(nn.Linear(prev_dim, prev_dim, bias=False),
                                         nn.BatchNorm1d(prev_dim),
                                         nn.ReLU(inplace=True), # first layer
                                         nn.Linear(prev_dim, prev_dim, bias=False),
                                         nn.BatchNorm1d(prev_dim),
                                         nn.ReLU(inplace=True), # second layer
-                                        self.encoder.head,
+                                        self.model.head,
                                         nn.BatchNorm1d(dim, affine=False)) # output layer
-        self.encoder.head[6].bias.requires_grad = False 
+        # self.model.head[6].bias.requires_grad = False 
 
         self.predictor = nn.Sequential(nn.Linear(dim, pred_dim, bias=False),
                                         nn.BatchNorm1d(pred_dim),
@@ -168,8 +168,8 @@ class SimSiam(nn.Module):
 
 
     def forward(self, x1, x2):
-        z1 = self.encoder(x1) # NxC
-        z2 = self.encoder(x2) # NxC
+        z1 = self.model(x1) # NxC
+        z2 = self.model(x2) # NxC
 
         p1 = self.predictor(z1) # NxC
         p2 = self.predictor(z2) # NxC
