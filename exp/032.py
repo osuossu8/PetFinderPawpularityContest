@@ -114,7 +114,7 @@ class SimSiamDataset:
         return len(self.X)
 
     def __getitem__(self, item):
-        path = CFG.train_root + self.X[item]
+        path = self.X[item]
         features = np.load(path)
         if CFG.get_transforms:
             features1 = CFG.get_transforms['train'](image=features)['image']
