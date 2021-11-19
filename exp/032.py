@@ -115,7 +115,8 @@ class SimSiamDataset:
 
     def __getitem__(self, item):
         path = self.X[item]
-        features = np.load(path)
+        features = cv2.imread(path)
+        features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
         if CFG.get_transforms:
             features1 = CFG.get_transforms['train'](image=features)['image']
             features2 = CFG.get_transforms['train'](image=features)['image']
