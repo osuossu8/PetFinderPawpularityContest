@@ -178,12 +178,12 @@ class Pet2Model(nn.Module):
         pretrained_model_path = 'output/ssl_001/ssl_model.bin'
         if pretrained_model_path:
             state_dict = dict()
-            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
+            for k, v in torch.load(pretrained_model_path, map_location='cpu').items():
                 if k[:6] == "model.":
                     k = k.replace("model.", "")
-                if k == 'head.weight':
+                if 'head' in k:
                     continue
-                if k == 'head.bias':
+                if 'predictor' in k:
                     continue
                 state_dict[k] = v
             self.model.load_state_dict(state_dict)
@@ -481,7 +481,6 @@ for fold in range(5):
 
         start_time = time.time()
 
-        # train_avg, train_loss = train_fn(model, train_dataloader, device, optimizer, scheduler)
         train_avg, train_loss, valid_avg, valid_loss, best_score = train_fn_calc_cv_interval(epoch, model, train_dataloader, valid_dataloader, device, optimizer, scheduler, best_score)
 
         valid_avg, valid_loss = valid_fn(model, valid_dataloader, device)
