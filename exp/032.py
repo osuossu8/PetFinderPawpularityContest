@@ -1,4 +1,5 @@
 import albumentations as A
+# import albumentations.pytorch.transforms as T
 import cv2
 import gc
 import os
@@ -49,32 +50,40 @@ class CFG:
     epochs = 20
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
-    LR = 2e-5
-    ETA_MIN = 7e-6
-    train_bs = 8
-    valid_bs = 16
+    LR = 2e-5 # 1e-4
+    ETA_MIN = 7e-6 # 1e-5
+    train_bs = 8 # 32
+    valid_bs = 16 # 64
     log_interval = 100
-    train_root = 'input/train_npy/'
+    train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
     in_chans = 3
-    ID_COL = 'ImagePath' # 'Id'
+    ID_COL = 'Id'
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
-    IMG_SIZE = 384
+    IMG_SIZE = 384 # 224 # 512 # 256 # 900
     EARLY_STOPPING = True
     APEX = False # True
     DEBUG = False # True
+    FEATURE_COLS = [
+        'Subject Focus', 'Eyes', 'Face', 'Near', 'Action',
+        'Accessory', 'Group', 'Collage', 'Human', 'Occlusion', 
+        'Info', 'Blur',
+    ]
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1, scale=(0.2, 1.)),           
+            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1, scale=(0.2, 1.0)),
             A.HorizontalFlip(p=0.5),
-            A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
-            A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+            A.VerticalFlip(p=0.5),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),
+        'valid' : A.Compose([
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
+        ], p=1.0),    
     }
 
 def set_seed(seed=42):
@@ -88,9 +97,8 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
 
 
-# environment
-set_seed(CFG.seed)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def get_device() -> torch.device:
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def init_logger(log_file='train.log'):
@@ -106,38 +114,68 @@ def init_logger(log_file='train.log'):
     return logger
 
 
-class SimSiamDataset:
-    def __init__(self, X):
+def calc_loss(y_true, y_pred):
+    if CFG.EVALUATION == 'RMSE':
+        return  np.sqrt(metrics.mean_squared_error(y_true, y_pred))
+    elif CFG.EVALUATION == 'AUC':
+        return metrics.roc_auc_score(np.array(y_true), np.array(y_pred))
+    else:
+        raise NotImplementedError()
+
+
+class Pet2Dataset:
+    def __init__(self, X, y=None, Meta_features=None):
         self.X = X
+        self.y = y
+        self.Meta_features = Meta_features
 
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, item):
-        path = self.X[item]
-        features = cv2.imread(path)
-        features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
-        if CFG.get_transforms:
-            features1 = CFG.get_transforms['train'](image=features)['image']
-            features2 = CFG.get_transforms['train'](image=features)['image']
+        if self.y is not None:
+            path = CFG.train_root + self.X[item] + '.npy'
+            features = np.load(path)
+            if CFG.get_transforms:
+                features = CFG.get_transforms['train'](image=features)['image']
+            features = np.transpose(features, (2, 0, 1)).astype(np.float32)
+            targets = self.y[item]
+       
+            return {
+                'x': torch.tensor(features, dtype=torch.float32),
+                'y': torch.tensor(targets, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
+            }
+          
+        else:
+            path = CFG.test_root + self.X[item] + '.npy'
+            features = np.load(path)
+            if CFG.get_transforms:
+                features = CFG.get_transforms['valid'](image=features)['image']
+            features = np.transpose(features, (2, 0, 1)).astype(np.float32)
 
-        features1 = np.transpose(features1, (2, 0, 1)).astype(np.float32)
-        features2 = np.transpose(features2, (2, 0, 1)).astype(np.float32)
-
-        return {
-            'x1': torch.tensor(features1, dtype=torch.float32),
-            'x2': torch.tensor(features2, dtype=torch.float32),
-        }
+            return {
+                'x': torch.tensor(features, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
+            }
 
 
-# https://github.com/facebookresearch/simsiam/blob/main/simsiam/builder.py
-class SimSiam(nn.Module):
-    def __init__(self, model_name, dim=2048, pred_dim=512):
-        super(SimSiam, self).__init__()    
+def init_layer(layer):
+    nn.init.xavier_uniform_(layer.weight)
+
+    if hasattr(layer, "bias"):
+        if layer.bias is not None:
+            layer.bias.data.fill_(0.)
+            
+            
+class Pet2Model(nn.Module):
+    def __init__(self, model_name):
+        super(Pet2Model, self).__init__()    
         
         # Model Encoder
         self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
-        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window12_384_22kto1k.pth'
+        # pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window12_384_22kto1k.pth'
+        pretrained_model_path = 'output/ssl_001/ssl_model.bin'
         if pretrained_model_path:
             state_dict = dict()
             for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
@@ -150,32 +188,13 @@ class SimSiam(nn.Module):
                 state_dict[k] = v
             self.model.load_state_dict(state_dict)
             print("loaded pretrained weight")
+        self.model.head = nn.Linear(self.model.num_features, 128)
+        self.dense = nn.Linear(128, CFG.TARGET_DIM)
 
-        prev_dim = self.model.num_features
-        self.model.head = nn.Sequential(nn.Linear(prev_dim, prev_dim, bias=False),
-                                        nn.BatchNorm1d(prev_dim),
-                                        nn.ReLU(inplace=True), # first layer
-                                        nn.Linear(prev_dim, prev_dim, bias=False),
-                                        nn.BatchNorm1d(prev_dim),
-                                        nn.ReLU(inplace=True), # second layer
-                                        self.model.head,
-                                        nn.BatchNorm1d(dim, affine=False)) # output layer
-        # self.model.head[6].bias.requires_grad = False 
-
-        self.predictor = nn.Sequential(nn.Linear(dim, pred_dim, bias=False),
-                                        nn.BatchNorm1d(pred_dim),
-                                        nn.ReLU(inplace=True), # hidden layer
-                                        nn.Linear(pred_dim, dim)) # output layer
-
-
-    def forward(self, x1, x2):
-        z1 = self.model(x1) # NxC
-        z2 = self.model(x2) # NxC
-
-        p1 = self.predictor(z1) # NxC
-        p2 = self.predictor(z2) # NxC
-
-        return p1, p2, z1.detach(), z2.detach()
+    def forward(self, features):
+        x = self.model(features)
+        output = self.dense(x)
+        return output.squeeze(-1)
 
 
 # ====================================================
@@ -200,29 +219,201 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def loss_fn(p1, p2, z1, z2):
-    criterion = nn.CosineSimilarity(dim=1)
-    loss = -(criterion(p1, z2).mean() + criterion(p2, z1).mean()) * 0.5
+class MetricMeter(object):
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.y_true = []
+        self.y_pred = []
+    
+    def update(self, y_true, y_pred):
+        self.y_true.extend(y_true.cpu().detach().numpy().tolist())
+        self.y_pred.extend(y_pred.cpu().detach().numpy().tolist())
+
+    @property
+    def avg(self):
+        self.score = calc_loss(self.y_true, self.y_pred)
+       
+        return {
+            CFG.EVALUATION : self.score,
+        }
+
+
+class RMSELoss(torch.nn.Module):
+    def __init__(self):
+        super(RMSELoss,self).__init__()
+
+    def forward(self,x,y):
+        criterion = nn.MSELoss()
+        loss = torch.sqrt(criterion(x, y))
+        return loss
+
+
+from torch.nn.modules.loss import _WeightedLoss
+import torch.nn.functional as F
+
+class SmoothBCEwLogits(_WeightedLoss):
+    def __init__(self, weight=None, reduction='mean', smoothing=0.0):
+        super().__init__(weight=weight, reduction=reduction)
+        self.smoothing = smoothing
+        self.weight = weight
+        self.reduction = reduction
+
+    @staticmethod
+    def _smooth(targets:torch.Tensor, n_labels:int, smoothing=0.0):
+        assert 0 <= smoothing < 1
+        with torch.no_grad():
+            targets = targets * (1.0 - smoothing) + 0.5 * smoothing
+        return targets
+
+    def forward(self, inputs, targets):
+        targets = SmoothBCEwLogits._smooth(targets, inputs.size(-1),
+            self.smoothing)
+        loss = F.binary_cross_entropy_with_logits(inputs, targets,self.weight)
+
+        if  self.reduction == 'sum':
+            loss = loss.sum()
+        elif  self.reduction == 'mean':
+            loss = loss.mean()
+
+        return loss
+
+
+def loss_fn(logits, targets):
+    loss_fct = torch.nn.BCEWithLogitsLoss()
+    loss = loss_fct(logits, targets)
     return loss
 
 
 def train_fn(model, data_loader, device, optimizer, scheduler):
     model.train()
     losses = AverageMeter()
+    scores = MetricMeter()
     tk0 = tqdm(data_loader, total=len(data_loader))
     
     for data in tk0:
         optimizer.zero_grad()
-        inputs1 = data['x1'].to(device)
-        inputs2 = data['x2'].to(device)
-        p1, p2, z1, z2 = model(inputs1, inputs2)
-        loss = loss_fn(p1, p2, z1, z2)
+        inputs = data['x'].to(device)
+        targets = data['y'].to(device)
+        outputs = model(inputs)
+        loss = loss_fn(outputs, targets / 100.0)
+        if CFG.APEX:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
+        optimizer.step()
+        scheduler.step()
+        losses.update(loss.item(), inputs.size(0))
+        outputs = torch.sigmoid(outputs) * 100.
+        scores.update(targets, outputs)
+        tk0.set_postfix(loss=losses.avg)
+    return scores.avg, losses.avg
+
+
+def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader, device, optimizer, scheduler, best_score):
+    model.train()
+    losses = AverageMeter()
+    scores = MetricMeter()
+    tk0 = tqdm(train_data_loader, total=len(train_data_loader))
+    
+    for batch_idx, data in enumerate(tk0):
+        optimizer.zero_grad()
+
+        inputs = data['x'].to(device)
+        targets = data['y'].to(device)
+        outputs = model(inputs)
+        loss = loss_fn(outputs, targets / 100.0)
         loss.backward()
         optimizer.step()
         scheduler.step()
-        losses.update(loss.item(), inputs1.size(0))
+        losses.update(loss.item(), inputs.size(0))
+        outputs = torch.sigmoid(outputs) * 100.
+        scores.update(targets, outputs)
         tk0.set_postfix(loss=losses.avg)
-    return losses.avg
+
+        if (batch_idx > 0) and (batch_idx % CFG.log_interval == 0):
+            valid_avg, valid_loss = valid_fn(model, valid_data_loader, device)
+
+            logger.info(f"Epoch {epoch+1}, Step {batch_idx} - valid_score:{valid_avg[CFG.EVALUATION]:0.5f}")
+
+            if valid_avg[CFG.EVALUATION] < best_score:
+                logger.info(f">>>>>>>> Model Improved From {best_score} ----> {valid_avg[CFG.EVALUATION]}")
+                torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
+                best_score = valid_avg[CFG.EVALUATION]
+
+            model.train() 
+
+    return scores.avg, losses.avg, valid_avg, valid_loss, best_score
+
+
+def valid_fn(model, data_loader, device):
+    model.eval()
+    losses = AverageMeter()
+    scores = MetricMeter()
+    tk0 = tqdm(data_loader, total=len(data_loader))
+    valid_preds = []
+    with torch.no_grad():
+        for data in tk0:
+            inputs = data['x'].to(device)
+            targets = data['y'].to(device)
+            outputs = model(inputs)
+            loss = loss_fn(outputs, targets / 100.0)
+            losses.update(loss.item(), inputs.size(0))
+            outputs = torch.sigmoid(outputs) * 100.
+            scores.update(targets, outputs)
+            tk0.set_postfix(loss=losses.avg)
+    return scores.avg, losses.avg
+
+
+def calc_cv(model_paths):
+    models = []
+    for model_path in model_paths:
+        model = Pet2Model(CFG.MODEL_NAME)
+        model.to(device)
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+        models.append(model)
+    
+    df = pd.read_csv("input/train_folds_5.csv")
+
+    idx = []
+    y_true = []
+    y_pred = []
+    for fold, model in enumerate(models):
+        val_df = df[df.kfold == fold].reset_index(drop=True)
+    
+        dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+        data_loader = torch.utils.data.DataLoader(
+            dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
+        )
+
+        final_output = []
+        for b_idx, data in tqdm(enumerate(data_loader)):
+            with torch.no_grad():
+                inputs = data['x'].to(device)
+                targets = data['y'].to(device)
+                output = model(inputs)
+                output = torch.sigmoid(output) * 100.
+                output = output.detach().cpu().numpy().tolist()
+                final_output.extend(output)
+        y_pred.append(np.array(final_output))
+        y_true.append(val_df[CFG.TARGET_COL].values)
+        idx.append(val_df[CFG.ID_COL].values)
+        torch.cuda.empty_cache()
+        
+    y_pred = np.concatenate(y_pred)
+    y_true = np.concatenate(y_true)
+    idx = np.concatenate(idx)
+    overall_cv_score = calc_loss(y_true, y_pred)
+    logger.info(f'cv score {overall_cv_score}')
+    oof_df = pd.DataFrame()
+    oof_df[CFG.ID_COL] = idx
+    oof_df['oof'] = y_pred
+    oof_df[CFG.TARGET_COL] = y_true
+    oof_df.to_csv(OUTPUT_DIR+"oof.csv", index=False)
+    print(oof_df.shape)
 
 
 OUTPUT_DIR = f'output/{CFG.EXP_ID}/'
@@ -232,49 +423,91 @@ if not os.path.exists(OUTPUT_DIR):
 warnings.filterwarnings("ignore")
 logger = init_logger(log_file=Path("log") / f"{CFG.EXP_ID}.log")
 
+# environment
+set_seed(CFG.seed)
+device = get_device()
+
 # data
-train = pd.read_csv("input/petfinder1_dataset_exist_image_path_with_pred_meta_data.csv").iloc[:-3858]
-train['ImagePath'] = train['PetID'].map(lambda x: f'input/train_images/{x}-1.jpg')
+train = pd.read_csv("input/train_folds_5.csv")
 
 print(train.shape)
 train.head()
 
-train_dataset = SimSiamDataset(X=train[CFG.ID_COL].values)
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=CFG.train_bs, num_workers=0, pin_memory=True, shuffle=True)
+# main loop
+for fold in range(5):
+    if fold not in CFG.folds:
+        continue
+    logger.info("=" * 120)
+    logger.info(f"Fold {fold} Training")
+    logger.info("=" * 120)
+
+    trn_df = train[train.kfold != fold].reset_index(drop=True)
+    val_df = train[train.kfold == fold].reset_index(drop=True)
+
+    if CFG.DEBUG:
+        trn_df = trn_df.head(64)
+        val_df = val_df.head(16)
+
+    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values, Meta_features=trn_df[CFG.FEATURE_COLS].values)
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=CFG.train_bs, num_workers=0, pin_memory=True, shuffle=True
+    )
     
-model = SimSiam(CFG.MODEL_NAME)   
-model = model.to(device)
+    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+    valid_dataloader = torch.utils.data.DataLoader(
+        valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
+    )
+ 
+    model = Pet2Model(CFG.MODEL_NAME)   
+    model = model.to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=CFG.epochs, T_mult=1, eta_min=CFG.ETA_MIN, last_epoch=-1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, T_mult=1, eta_min=CFG.ETA_MIN, last_epoch=-1)
 
-patience = 6
-p = 0
-min_loss = 999
+    # ====================================================
+    # apex
+    # ====================================================
+    if CFG.APEX:
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
-for epoch in range(CFG.epochs):
+    patience = 3 # 4
+    p = 0
+    min_loss = 999
+    best_score = np.inf
 
-    logger.info("Starting {} epoch...".format(epoch+1))
+    for epoch in range(CFG.epochs):
 
-    start_time = time.time()
+        logger.info("Starting {} epoch...".format(epoch+1))
 
-    train_loss = train_fn(model, train_dataloader, device, optimizer, scheduler)
+        start_time = time.time()
 
-    scheduler.step()
+        # train_avg, train_loss = train_fn(model, train_dataloader, device, optimizer, scheduler)
+        train_avg, train_loss, valid_avg, valid_loss, best_score = train_fn_calc_cv_interval(epoch, model, train_dataloader, valid_dataloader, device, optimizer, scheduler, best_score)
+
+        valid_avg, valid_loss = valid_fn(model, valid_dataloader, device)
+        scheduler.step()
         
-    elapsed = time.time() - start_time
+        elapsed = time.time() - start_time
 
-    logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.5f} time: {elapsed:.0f}s')
+        logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.5f}  avg_val_loss: {valid_loss:.5f}  time: {elapsed:.0f}s')
+        logger.info(f"Epoch {epoch+1} - train_score:{train_avg[CFG.EVALUATION]:0.5f}  valid_score:{valid_avg[CFG.EVALUATION]:0.5f}")        
 
-    if train_loss < min_loss:
-        logger.info(f">>>>>>>> Model Improved From {min_loss} ----> {train_loss}")
-        torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
-        min_loss = train_loss
-        p = 0
+        if valid_avg[CFG.EVALUATION] < best_score:
+            logger.info(f">>>>>>>> Model Improved From {best_score} ----> {valid_avg[CFG.EVALUATION]}")
+            torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
+            best_score = valid_avg[CFG.EVALUATION]
+            p = 0 
 
-    if CFG.EARLY_STOPPING:
-        p += 1
-        if p > patience:
-            logger.info(f'Early Stopping')
-            break
+        if CFG.EARLY_STOPPING:
+            p += 1
+            if p > patience:
+                logger.info(f'Early Stopping')
+                break
 
+if len(CFG.folds) == 1:
+    pass
+else:
+    model_paths = [f'output/{CFG.EXP_ID}/fold-{i}.bin' for i in CFG.folds]
+
+    calc_cv(model_paths)
+    print('calc cv finished!!')
