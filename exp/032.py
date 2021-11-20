@@ -73,9 +73,13 @@ class CFG:
         'Info', 'Blur',
     ]
 
+
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1, scale=(0.2, 1.0)),
+            A.OneOf([
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4, scale=(0.75, 0.95)),
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
+            ], p=1.0),            
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
@@ -85,6 +89,7 @@ CFG.get_transforms = {
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),    
     }
+
 
 def set_seed(seed=42):
     random.seed(seed)
