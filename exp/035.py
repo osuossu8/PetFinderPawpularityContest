@@ -50,8 +50,8 @@ class CFG:
     epochs = 20
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
-    LR = 2e-5 # 1e-4
-    ETA_MIN = 7e-6 # 1e-5
+    LR = 1e-4 # 2e-5 # 1e-4
+    ETA_MIN = 1e-5 # 7e-6 # 1e-5
     train_bs = 8 # 32
     valid_bs = 16 # 64
     log_interval = 100
