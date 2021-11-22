@@ -52,8 +52,8 @@ class CFG:
     N_FOLDS = 5
     LR = 1e-4 # 2e-5 # 1e-4
     ETA_MIN = 1e-5 # 7e-6 # 1e-5
-    train_bs = 8 # 32
-    valid_bs = 16 # 64
+    train_bs = 16 # 8 # 32
+    valid_bs = 32 # 16 # 64
     log_interval = 100
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
