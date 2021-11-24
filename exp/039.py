@@ -400,11 +400,11 @@ def train_mixup_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_
         targets = data['y'].to(device)
         if np.random.rand()<0.5:
             inputs, new_targets = mixup(inputs, targets, 0.4)
-            outputs = model(inputs, metas)
+            outputs = model(inputs)
             loss = mixup_criterion(outputs, [new_targets[0] / 100.0, new_targets[1] / 100.0, new_targets[2]])
         else:
             new_targets = [targets]
-            outputs = model(inputs, metas)
+            outputs = model(inputs)
             loss = loss_fn(outputs, new_targets[0] / 100.0)
 
         loss.backward()
