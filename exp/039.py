@@ -392,7 +392,7 @@ def train_mixup_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_
     model.train()
     losses = AverageMeter()
     scores = MetricMeter()
-    tk0 = tqdm(data_loader, total=len(data_loader))
+    tk0 = tqdm(train_data_loader, total=len(train_data_loader))
 
     for batch_idx, data in enumerate(tk0):
         optimizer.zero_grad()
