@@ -193,7 +193,7 @@ class Pet2Model(nn.Module):
             self.model.load_state_dict(state_dict)
             print("loaded pretrained weight")
         self.dense = nn.Sequential(
-            nn.Dropout(0.5), nn.Linear(self.model.num_features, self.cfg.model.output_dim)
+            nn.Dropout(0.5), nn.Linear(self.model.num_features, CFG.TARGET_DIM)
         )
 
     def forward(self, features):
