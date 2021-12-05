@@ -75,10 +75,10 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            A.OneOf([
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4, scale=(0.65, 0.95)),
-                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
-            ], p=1.0),            
+            #A.OneOf([
+            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0, scale=(0.7, 1.0)),
+            #    A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
+            #], p=1.0),            
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             # A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
