@@ -83,7 +83,7 @@ CFG.get_transforms = {
                 A.HueSaturationValue(p=0.25, hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2),
                 A.ShiftScaleRotate(p=0.25, shift_limit=0.0625, scale_limit=0.2, rotate_limit=20),
                 A.CoarseDropout(p=0.25),
-            ], p=1.0),
+            ], p=0.5),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),
         'valid' : A.Compose([
