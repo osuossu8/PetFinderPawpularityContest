@@ -75,14 +75,15 @@ class CFG:
 
 CFG.get_transforms = {
         'train' : A.Compose([
-            #A.OneOf([
-            A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1.0, scale=(0.7, 1.0)),
-            #    A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
-            #], p=1.0),            
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
-            # A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
-            # A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+            A.OneOf([
+                A.RandomBrightnessContrast(p=0.25, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+                A.HueSaturationValue(p=0.25, hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2),
+                A.ShiftScaleRotate(p=0.25, shift_limit=0.0625, scale_limit=0.2, rotate_limit=20),
+                A.CoarseDropout(p=0.25),
+            ], p=1.0),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),
         'valid' : A.Compose([
