@@ -64,7 +64,7 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 224 # 384 # 224 # 512 # 256 # 900
-    EARLY_STOPPING = True
+    EARLY_STOPPING = False # True
     APEX = False # True
     DEBUG = False # True
     FEATURE_COLS = [
@@ -81,8 +81,8 @@ CFG.get_transforms = {
             ], p=1.0),            
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
-            A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
-            A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+            # A.Affine(rotate=15, translate_percent=(0.1, 0.1), scale=(0.9, 1.1)),
+            # A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),
         'valid' : A.Compose([
@@ -506,6 +506,11 @@ for fold in range(5):
             if p > patience:
                 logger.info(f'Early Stopping')
                 break
+
+        if epoch > 10:
+            logger.info(f'Early Stopping')
+            break
+
 
 if len(CFG.folds) == 1:
     pass
