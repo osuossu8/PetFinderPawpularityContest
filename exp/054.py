@@ -74,8 +74,20 @@ class CFG:
 CFG.get_transforms = {
         'train' : A.Compose([
             A.OneOf([
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4, scale=(0.75, 0.95)),
-                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.2, scale=(0.85, 0.95)),
+                A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.2),
+                A.Compose([
+                    A.Resize(int(CFG.IMG_SIZE * 1.5), int(CFG.IMG_SIZE * 1.5), p=1.0),
+                    A.CenterCrop(p=1.0, height=CFG.IMG_SIZE, width=CFG.IMG_SIZE),
+                ], p=0.2),
+                A.Compose([
+                    A.Resize(int(CFG.IMG_SIZE * 2.0), int(CFG.IMG_SIZE * 2.0), p=1.0),
+                    A.CenterCrop(p=1.0, height=CFG.IMG_SIZE, width=CFG.IMG_SIZE),
+                ], p=0.2),
+                A.Compose([
+                    A.Resize(int(CFG.IMG_SIZE * 3.0), int(CFG.IMG_SIZE * 3.0), p=1.0),
+                    A.CenterCrop(p=1.0, height=CFG.IMG_SIZE, width=CFG.IMG_SIZE),
+                ], p=0.2),
             ], p=1.0),            
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
@@ -307,7 +319,7 @@ def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader
         targets = data['y'].to(device)
         cat_targets = data['meta'].to(device)
         outputs, cat_out = model(inputs)
-        loss = loss_fn(outputs, targets / 100.0) * 0.6 + aux_loss_fn(cat_out, cat_targets) * 0.4
+        loss = loss_fn(outputs, targets / 100.0) * 0.5 + aux_loss_fn(cat_out, cat_targets) * 0.5
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -343,7 +355,7 @@ def valid_fn(model, data_loader, device):
             targets = data['y'].to(device)
             cat_targets = data['meta'].to(device)
             outputs, cat_out = model(inputs)
-            loss = loss_fn(outputs, targets / 100.0) * 0.6 + aux_loss_fn(cat_out, cat_targets) * 0.4
+            loss = loss_fn(outputs, targets / 100.0) * 0.5 + aux_loss_fn(cat_out, cat_targets) * 0.5
             losses.update(loss.item(), inputs.size(0))
             outputs = torch.sigmoid(outputs) * 100.
             scores.update(targets, outputs)
