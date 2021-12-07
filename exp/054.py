@@ -306,7 +306,7 @@ def aux_loss_fn(logits, targets):
     return loss
 
 
-def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader, device, optimizer, scheduler, best_score):
+def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader, device, optimizer, scheduler, best_score, p):
     model.train()
     losses = AverageMeter()
     scores = MetricMeter()
@@ -319,7 +319,7 @@ def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader
         targets = data['y'].to(device)
         cat_targets = data['meta'].to(device)
         outputs, cat_out = model(inputs)
-        loss = loss_fn(outputs, targets / 100.0) * 0.5 + aux_loss_fn(cat_out, cat_targets) * 0.5
+        loss = loss_fn(outputs, targets / 100.0) * 0.7 + aux_loss_fn(cat_out, cat_targets) * 0.3
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -337,10 +337,11 @@ def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader
                 logger.info(f">>>>>>>> Model Improved From {best_score} ----> {valid_avg[CFG.EVALUATION]}")
                 torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
                 best_score = valid_avg[CFG.EVALUATION]
+                p = 0
 
             model.train() 
 
-    return scores.avg, losses.avg, valid_avg, valid_loss, best_score
+    return scores.avg, losses.avg, valid_avg, valid_loss, best_score, p
 
 
 def valid_fn(model, data_loader, device):
@@ -355,7 +356,7 @@ def valid_fn(model, data_loader, device):
             targets = data['y'].to(device)
             cat_targets = data['meta'].to(device)
             outputs, cat_out = model(inputs)
-            loss = loss_fn(outputs, targets / 100.0) * 0.5 + aux_loss_fn(cat_out, cat_targets) * 0.5
+            loss = loss_fn(outputs, targets / 100.0) * 0.6 + aux_loss_fn(cat_out, cat_targets) * 0.4
             losses.update(loss.item(), inputs.size(0))
             outputs = torch.sigmoid(outputs) * 100.
             scores.update(targets, outputs)
@@ -484,7 +485,7 @@ for fold in range(5):
 
         start_time = time.time()
 
-        train_avg, train_loss, valid_avg, valid_loss, best_score = train_fn_calc_cv_interval(epoch, model, train_dataloader, valid_dataloader, device, optimizer, scheduler, best_score)
+        train_avg, train_loss, valid_avg, valid_loss, best_score, p = train_fn_calc_cv_interval(epoch, model, train_dataloader, valid_dataloader, device, optimizer, scheduler, best_score, p)
 
         valid_avg, valid_loss = valid_fn(model, valid_dataloader, device)
         scheduler.step()
