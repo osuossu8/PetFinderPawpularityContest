@@ -76,7 +76,7 @@ class CFG:
 CFG.get_transforms = {
         'train' : A.Compose([
             A.OneOf([
-                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4, scale=(0.75, 1.0)),
+                A.RandomResizedCrop(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.4, scale=(0.75, 0.9)),
                 A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=0.6),
             ], p=1.0),            
             A.HorizontalFlip(p=0.5),
