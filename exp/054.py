@@ -196,7 +196,7 @@ class Pet2Model(nn.Module):
         x = self.model(features)
         output = self.dense(x)
         cat_out = self.cat_dense(x)
-        return output.squeeze(-1), cat_out.squeeze(-1)
+        return output.squeeze(-1), cat_out
 
 
 # ====================================================
