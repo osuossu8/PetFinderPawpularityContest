@@ -60,10 +60,9 @@ class CFG:
     ID_COL = 'ImagePath' # 'Id'
     TARGET_COL = [f'tf_idf_svd_{i}' for i in range(16)] # 'AdoptionSpeed' # 'Pawpularity'
     TARGET_DIM = 16
-    EVALUATION = 'LOGLOSS' # 'RMSE'
+    EVALUATION = 'Weighted_MAE' # 'LOGLOSS' # 'RMSE'
     IMG_SIZE = 224
     EARLY_STOPPING = True
-    APEX = False # True
     DEBUG = False # True
     FEATURE_COLS = [
         'Subject Focus', 'Eyes', 'Face', 'Near', 'Action',
@@ -126,6 +125,12 @@ def calc_loss(y_true, y_pred):
         return metrics.roc_auc_score(np.array(y_true), np.array(y_pred))
     elif CFG.EVALUATION == 'LOGLOSS':
         return metrics.log_loss(np.array(y_true), np.array(y_pred))
+    elif CFG.EVALUATION == 'Weighted_MAE':
+        s_all = 0
+        for i in range(16):
+            s = np.sqrt(metrics.mean_absolute_error(y_true[i], y_pred[i]))
+            s_all += s
+        return  s_all
     else:
         raise NotImplementedError()
 
@@ -259,7 +264,7 @@ class RMSELoss(torch.nn.Module):
 def loss_fn(logits, targets):
     loss_fct = torch.nn.BCEWithLogitsLoss()
     loss = loss_fct(logits, targets)
-    return 
+    return loss
 
 
 def train_fn(model, data_loader, device, optimizer, scheduler):
