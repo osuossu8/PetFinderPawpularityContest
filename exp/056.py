@@ -462,12 +462,12 @@ def add_adoption_speed_preds(model_paths):
     df = pd.read_csv("input/train_folds_no_dup_5.csv")  
     y_pred = []
     for fold, model_path in enumerate(model_paths):
-        model = Pet1Model(CFG.MODEL_NAME)
+        model = Pet1Model("swin_base_patch4_window7_224")
         model.to(device)
         model.load_state_dict(torch.load(model_path))
         model.eval()
         
-        dataset = Pet2Dataset(X=df[CFG.ID_COL].values, y=None, Meta_features=df[CFG.FEATURE_COLS].values)
+        dataset = Pet2Dataset(X=df[CFG.ID_COL].values, y=df[CFG.TARGET_COL].values, Meta_features=df[CFG.TARGET_COL].values)
         data_loader = torch.utils.data.DataLoader(
             dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
         )
