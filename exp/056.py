@@ -506,6 +506,7 @@ adoption_speed_preds = add_adoption_speed_preds(model_paths)
 print(adoption_speed_preds[:15])
 
 train['AdoptionSpeed'] = adoption_speed_preds
+train.to_csv("input/train_folds_no_dup_5_adoption_speed.csv", index=False)
 
 print(train.shape)
 train.head()
