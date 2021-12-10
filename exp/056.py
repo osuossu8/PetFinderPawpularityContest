@@ -458,6 +458,56 @@ def calc_cv(model_paths):
     print(oof_df.shape)
 
 
+def to_bins(x, borders):
+    for i in range(len(borders)):
+        if x <= borders[i]:
+            return i
+    return len(borders)
+
+
+class OptimizedRounder(object):
+    def __init__(self):
+        self.coef_ = 0
+
+    def _loss(self, coef, X, y, idx):
+        X_p = np.array([to_bins(pred, coef) for pred in X])
+        ll = -calc_loss(y, X_p)
+        return ll
+
+    def fit(self, X, y):
+        coef = [0.2, 0.4, 0.6, 0.8]
+        golden1 = 0.618
+        golden2 = 1 - golden1
+        ab_start = [(0.01, 0.3), (0.15, 0.56), (0.35, 0.75), (0.6, 0.9)]
+        for it1 in range(10):
+            for idx in range(4):
+                # golden section search
+                a, b = ab_start[idx]
+                # calc losses
+                coef[idx] = a
+                la = self._loss(coef, X, y, idx)
+                coef[idx] = b
+                lb = self._loss(coef, X, y, idx)
+                for it in range(20):
+                    # choose value
+                    if la > lb:
+                        a = b - (b - a) * golden1
+                        coef[idx] = a
+                        la = self._loss(coef, X, y, idx)
+                    else:
+                        b = b - (b - a) * golden2
+                        coef[idx] = b
+                        lb = self._loss(coef, X, y, idx)
+        self.coef_ = {'x': coef}
+
+    def predict(self, X, coef):
+        X_p = np.array([to_bins(pred, coef) for pred in X])
+        return X_p
+
+    def coefficients(self):
+        return self.coef_['x']
+
+
 def add_adoption_speed_preds(model_paths):  
     df = pd.read_csv("input/train_folds_no_dup_5.csv")  
     y_pred = []
@@ -497,16 +547,39 @@ logger = init_logger(log_file=Path("log") / f"{CFG.EXP_ID}.log")
 set_seed(CFG.seed)
 device = get_device()
 
+"""
 # data
 train = pd.read_csv("input/train_folds_no_dup_5.csv")
 
-model_paths = [f'output/adoption_speed_prediction//fold-{i}.bin' for i in CFG.folds]
+model_paths = [f'output/adoption_speed_prediction/fold-{i}.bin' for i in CFG.folds]
 
 adoption_speed_preds = add_adoption_speed_preds(model_paths)
 print(adoption_speed_preds[:15])
 
 train['AdoptionSpeed'] = adoption_speed_preds
 train.to_csv("input/train_folds_no_dup_5_adoption_speed.csv", index=False)
+"""
+
+train = pd.read_csv("input/train_folds_no_dup_5_adoption_speed.csv")
+
+oof = pd.read_csv("output/adoption_speed_prediction/oof.csv")
+print(oof['AdoptionSpeed'].value_counts())
+print(calc_loss(oof['AdoptionSpeed'], oof['oof']))
+
+from scipy.stats import rankdata
+
+
+oof['oof'] = rankdata(oof['oof'])/len(oof)
+train['AdoptionSpeed'] = rankdata(train['AdoptionSpeed'])/len(train)
+
+optR = OptimizedRounder()
+optR.fit(oof['oof'], oof['AdoptionSpeed'])
+coefficients = optR.coefficients()
+oof['oof'] = optR.predict(oof['oof'], coefficients)
+train['AdoptionSpeed'] = optR.predict(train['AdoptionSpeed'].values, coefficients).astype(int)
+
+print(train['AdoptionSpeed'].describe())
+print(train['AdoptionSpeed'].astype(int).value_counts())
 
 print(train.shape)
 train.head()
