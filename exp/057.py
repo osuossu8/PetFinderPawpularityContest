@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import List
 from PIL import Image
 
+from scipy.stats import rankdata
 from sklearn import model_selection
 from sklearn import metrics
 from sklearn.metrics import mean_squared_error, roc_auc_score
@@ -199,7 +200,7 @@ class Pet2Model(nn.Module):
 
     def forward(self, features, meta):
         x = self.model(features)
-        x = torch.cat([x, meta], 1)
+        x = torch.cat([x, meta.view(-1, 1)], 1)
         output = self.dense(x)
         return output.squeeze(-1)
 
@@ -417,7 +418,16 @@ def calc_cv(model_paths):
         model.eval()
         models.append(model)
     
-    df = pd.read_csv("input/train_folds_no_dup_5.csv")
+    df = pd.read_csv("input/train_folds_no_dup_5_adoption_speed.csv")
+    oof = pd.read_csv("output/adoption_speed_prediction/oof.csv")
+
+    oof['oof'] = rankdata(oof['oof'])/len(oof)
+    df['AdoptionSpeed'] = rankdata(df['AdoptionSpeed'])/len(df)
+
+    optR = OptimizedRounder()
+    optR.fit(oof['oof'], oof['AdoptionSpeed'])
+    coefficients = optR.coefficients()
+    df['AdoptionSpeed'] = optR.predict(df['AdoptionSpeed'].values, coefficients).astype(int)
 
     idx = []
     y_true = []
@@ -435,7 +445,8 @@ def calc_cv(model_paths):
             with torch.no_grad():
                 inputs = data['x'].to(device)
                 targets = data['y'].to(device)
-                output = model(inputs)
+                adop = data['meta'].to(device)
+                output = model(inputs, adop)
                 output = torch.sigmoid(output) * 100.
                 output = output.detach().cpu().numpy().tolist()
                 final_output.extend(output)
@@ -564,8 +575,6 @@ train = pd.read_csv("input/train_folds_no_dup_5_adoption_speed.csv")
 oof = pd.read_csv("output/adoption_speed_prediction/oof.csv")
 print(oof['AdoptionSpeed'].value_counts())
 print(calc_loss(oof['AdoptionSpeed'], oof['oof']))
-
-from scipy.stats import rankdata
 
 
 oof['oof'] = rankdata(oof['oof'])/len(oof)
