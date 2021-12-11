@@ -33,7 +33,7 @@ from PIL import Image
 from sklearn import model_selection
 from sklearn import metrics
 from sklearn.metrics import mean_squared_error, roc_auc_score
-from sklearn.model_selection import KFold,StratifiedKFold
+from sklearn.model_selection import KFold,StratifiedKFold,GroupKFold
 
 import timm
 from tqdm import tqdm
@@ -375,7 +375,7 @@ class StratifiedGroupKFold():
         for unique_y in fold['y_mean'].unique():
             mask = fold.y_mean == unique_y
             selected = fold[mask].reset_index(drop=True)
-            cv = GroupKFold(n_splits=n_splits)
+            cv = GroupKFold(n_splits=self.n_splits)
             for i, (train_index, valid_index) in enumerate(
                     cv.split(range(len(selected)), y=None, groups=selected['groups'])):
                 selected.loc[valid_index, 'fold_id'] = i
@@ -395,7 +395,7 @@ def create_folds(data, num_splits):
     # initiate the kfold class from model_selection module
     # kf = model_selection.StratifiedKFold(n_splits=num_splits, shuffle=True, random_state=42)
 
-    kf = StratifiedGroupKFold(n_splits=n_splits)
+    kf = StratifiedGroupKFold(n_splits=num_splits)
 
     # fill the new kfold column
     # note that, instead of targets, we use bins!
