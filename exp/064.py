@@ -194,12 +194,18 @@ class Pet2Model(nn.Module):
         #         state_dict[k] = v
         #     self.model.load_state_dict(state_dict)
         print("loaded pretrained weight")
-        self.model.last_linear = nn.Linear(self.model.num_features, 128)
-        self.dense = nn.Linear(128, CFG.TARGET_DIM)
+        # self.model.head = nn.Linear(self.model.num_features, 128)
+        self.l0 = nn.Sequential(
+            nn.Linear(1280, 128),
+            nn.LayerNorm(128),
+            nn.PReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(128, CFG.TARGET_DIM)
+        )
 
     def forward(self, features):
         x = self.model(features)
-        output = self.dense(x)
+        output = self.l0(x)
         return output.squeeze(-1)
 
 
