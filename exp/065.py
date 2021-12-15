@@ -146,7 +146,7 @@ class Pet2Dataset:
     def __getitem__(self, item):
         if self.y is not None:
             path = CFG.train_root + self.X[item] + '.npy'
-            features = np.load(path)
+            img = np.load(path)
 
             height = img.shape[0]
             width = img.shape[1]
@@ -162,7 +162,7 @@ class Pet2Dataset:
                 img = img[:, center - half:center + half]
 
             if CFG.get_transforms:
-                features = CFG.get_transforms['train'](image=features)['image']
+                features = CFG.get_transforms['train'](image=img)['image']
             features = np.transpose(features, (2, 0, 1)).astype(np.float32)
             targets = self.y[item]
        
@@ -174,7 +174,7 @@ class Pet2Dataset:
           
         else:
             path = CFG.test_root + self.X[item] + '.npy'
-            features = np.load(path)
+            img = np.load(path)
 
             height = img.shape[0]
             width = img.shape[1]
@@ -190,7 +190,7 @@ class Pet2Dataset:
                 img = img[:, center - half:center + half]
 
             if CFG.get_transforms:
-                features = CFG.get_transforms['valid'](image=features)['image']
+                features = CFG.get_transforms['valid'](image=img)['image']
             features = np.transpose(features, (2, 0, 1)).astype(np.float32)
 
             return {
