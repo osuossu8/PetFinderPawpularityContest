@@ -206,26 +206,14 @@ def init_layer(layer):
         if layer.bias is not None:
             layer.bias.data.fill_(0.)
             
-            
+
 class Pet2Model(nn.Module):
     def __init__(self, model_name):
         super(Pet2Model, self).__init__()    
         
         # Model Encoder
-        self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
-        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window7_224_22kto1k.pth'
-        if pretrained_model_path:
-            state_dict = dict()
-            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
-                if k[:6] == "model.":
-                    k = k.replace("model.", "")
-                if k == 'head.weight':
-                    continue
-                if k == 'head.bias':
-                    continue
-                state_dict[k] = v
-            self.model.load_state_dict(state_dict)
-            print("loaded pretrained weight")
+        self.model = timm.create_model(model_name, pretrained=True, num_classes=0, in_chans=CFG.in_chans)
+        print("loaded pretrained weight")
         self.model.head = nn.Linear(self.model.num_features, 128)
         self.dense = nn.Linear(128, CFG.TARGET_DIM)
 
