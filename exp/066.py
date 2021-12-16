@@ -261,18 +261,29 @@ class HybridEmbed(nn.Module):
 
 
 class Pet2HybridModel(nn.Module):
-    def __init__(self, backbone, embedder, pretrained = True):
+    def __init__(self, backbone, embedder):
         super(Pet2HybridModel, self).__init__()
-        self.backbone = timm.create_model(backbone, pretrained=pretrained, num_classes=0, in_chans=CFG.in_chans)
-        print("loaded pretrained weight for backbone")
-        self.embedder = timm.create_model(embedder, features_only=True, out_indices=[2], pretrained=pretrained)
+        self.backbone = timm.create_model(backbone, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
+        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window7_224_22kto1k.pth'
+        if pretrained_model_path:
+            state_dict = dict()
+            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
+                if k[:6] == "model.":
+                    k = k.replace("model.", "")
+                if k == 'head.weight':
+                    continue
+                if k == 'head.bias':
+                    continue
+                state_dict[k] = v
+            self.backbone.load_state_dict(state_dict)
+            print("loaded pretrained weight for backbone")
+        self.embedder = timm.create_model(embedder, features_only=True, out_indices=[2], pretrained=True)
         print("loaded pretrained weight for embedder")
         self.backbone.patch_embed = HybridEmbed(self.embedder, img_size=CFG.IMG_SIZE, embed_dim=192)
         self.fc = nn.Linear(self.backbone.num_features, CFG.TARGET_DIM)
 
     def forward(self, images):
         features = self.backbone(images)              # features = (bs, embedding_size)
-        print(features.shape)
         output = self.fc(features)                    # outputs  = (bs, num_classes)
         return output.squeeze(-1)
 
