@@ -417,7 +417,7 @@ def valid_fn(model, data_loader, device):
 def calc_cv(model_paths):
     models = []
     for model_path in model_paths:
-        model = Pet2Model(CFG.MODEL_NAME)
+        model = Pet2HybridModel(CFG.MODEL_NAME, CFG.EMBEDDER_NAME)   
         model.to(device)
         model.load_state_dict(torch.load(model_path))
         model.eval()
@@ -505,7 +505,7 @@ for fold in range(5):
         valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
     )
  
-    model = Pet2Model(CFG.MODEL_NAME)   
+    model = Pet2HybridModel(CFG.MODEL_NAME, CFG.EMBEDDER_NAME)   
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.LR)
