@@ -57,14 +57,14 @@ class CFG:
     log_interval = 32 # 100
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
-    MODEL_NAME = "vit_large_patch32_384" # "vit_base_r50_s16_384" # "swin_large_patch4_window7_224" # "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
+    MODEL_NAME = "swin_large_patch4_window7_224" # "vit_large_patch32_224_in21k" # 'swin_base_patch4_window7_224'
     EMBEDDER_NAME = "tf_efficientnetv2_m_in21ft1k"
     in_chans = 3
     ID_COL = 'Id'
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
-    IMG_SIZE = 384 # 224 # 512 # 256 # 900
+    IMG_SIZE = 448 # 384 # 224 # 512 # 256 # 900
     EARLY_STOPPING = True
     APEX = False # True
     DEBUG = False # True
@@ -201,6 +201,20 @@ class Pet2Dataset:
 
 
 from functools import partial
+from itertools import repeat
+import collections.abc
+
+
+# From PyTorch internals
+def _ntuple(n):
+    def parse(x):
+        if isinstance(x, collections.abc.Iterable):
+            return x
+        return tuple(repeat(x, n))
+    return parse
+
+
+to_2tuple = _ntuple(2)
 
 
 class HybridEmbed(nn.Module):
@@ -247,29 +261,18 @@ class HybridEmbed(nn.Module):
 
 
 class Pet2HybridModel(nn.Module):
-    def __init__(self, backbone, embedder):
+    def __init__(self, backbone, embedder, pretrained = True):
         super(Pet2HybridModel, self).__init__()
-        self.backbone = timm.create_model(backbone, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
-        pretrained_model_path = '/root/.cache/torch/checkpoints/jx_vit_base_p32_384-830016f5.pth'
-        if pretrained_model_path:
-            state_dict = dict()
-            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
-                if k[:6] == "model.":
-                    k = k.replace("model.", "")
-                if k == 'head.weight':
-                    continue
-                if k == 'head.bias':
-                    continue
-                state_dict[k] = v
-            self.backbone.load_state_dict(state_dict)
-            print("loaded pretrained weight for backbone")
-        self.embedder = timm.create_model(embedder, features_only=True, out_indices=[2], pretrained=True)
+        self.backbone = timm.create_model(backbone, pretrained=pretrained, num_classes=0, in_chans=CFG.in_chans)
+        print("loaded pretrained weight for backbone")
+        self.embedder = timm.create_model(embedder, features_only=True, out_indices=[2], pretrained=pretrained)
         print("loaded pretrained weight for embedder")
         self.backbone.patch_embed = HybridEmbed(self.embedder, img_size=CFG.IMG_SIZE, embed_dim=192)
         self.fc = nn.Linear(self.backbone.num_features, CFG.TARGET_DIM)
 
     def forward(self, images):
         features = self.backbone(images)              # features = (bs, embedding_size)
+        print(features.shape)
         output = self.fc(features)                    # outputs  = (bs, num_classes)
         return output.squeeze(-1)
 
