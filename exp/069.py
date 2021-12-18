@@ -190,7 +190,7 @@ class Pet2Model(nn.Module):
         # Model Encoder
         self.model = timm.create_model(model_name, pretrained=True, num_classes=0, in_chans=CFG.in_chans)
         print("loaded pretrained weight")
-        self.dense = nn.Linear(768, CFG.TARGET_DIM)
+        self.dense = nn.Linear(1280, CFG.TARGET_DIM)
 
     def forward(self, features):
         x = self.model(features)
