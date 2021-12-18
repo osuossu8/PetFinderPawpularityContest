@@ -189,7 +189,7 @@ class Pet2Model(nn.Module):
         
         # Model Encoder
         self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
-        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_base_patch4_window7_224_in22k.pth'
+        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_base_patch4_window7_224_22kto1k.pth'
         if pretrained_model_path:
             state_dict = dict()
             for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
