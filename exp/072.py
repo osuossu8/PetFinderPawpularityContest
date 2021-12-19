@@ -413,7 +413,7 @@ for fold in range(5):
 
     teacher_model = Pet2TeacherModel(CFG.TEACHER_MODEL_NAME)
     teacher_model = teacher_model.to(device)
-    teacher_model.load_state_dict(torch.load('output/055/'+f'fold-{fold}.bin'))
+    teacher_model.load_state_dict(torch.load('output/070/'+f'fold-{fold}.bin'))
     teacher_model.eval()
 
     model = Pet2Model(CFG.MODEL_NAME)   
