@@ -149,27 +149,27 @@ def make_preds(model_dict1, model_dict2, model_dict3, model_dict4, model_dict5):
     for fold in CFG.folds:
         model1 = Pet2Model(model_dict1['MODEL_NAME'])
         model1.to(device)
-        model1.load_state_dict(torch.load(f'../input/kaerururu-petfinder2-{model_dict1["EXP_ID"]}/fold-{fold}.bin'))
+        model1.load_state_dict(torch.load(f'output/{model_dict1["EXP_ID"]}/fold-{fold}.bin'))
         model1.eval()
         
         model2 = Pet2Model(model_dict2['MODEL_NAME'])
         model2.to(device)
-        model2.load_state_dict(torch.load(f'../input/kaerururu-petfinder2-{model_dict2["EXP_ID"]}/fold-{fold}.bin'))
+        model2.load_state_dict(torch.load(f'output/{model_dict2["EXP_ID"]}/fold-{fold}.bin'))
         model2.eval()
         
         model3 = Pet2Model(model_dict3['MODEL_NAME'])
         model3.to(device)
-        model3.load_state_dict(torch.load(f'../input/kaerururu-petfinder2-{model_dict3["EXP_ID"]}/fold-{fold}.bin'))
+        model3.load_state_dict(torch.load(f'output/{model_dict3["EXP_ID"]}/fold-{fold}.bin'))
         model3.eval()
         
         model4 = Pet2CNNModel(model_dict4['MODEL_NAME'])
         model4.to(device)
-        model4.load_state_dict(torch.load(f'../input/kaerururu-petfinder2-{model_dict4["EXP_ID"]}/fold-{fold}.bin'))
+        model4.load_state_dict(torch.load(f'output/{model_dict4["EXP_ID"]}/fold-{fold}.bin'))
         model4.eval()
         
         model5 = Pet2VitCNNModel(model_dict5['MODEL_NAME'])
         model5.to(device)
-        model5.load_state_dict(torch.load(f'../input/kaerururu-petfinder2-{model_dict5["EXP_ID"]}/fold-{fold}.bin'))
+        model5.load_state_dict(torch.load(f'output/{model_dict5["EXP_ID"]}/fold-{fold}.bin'))
         model5.eval()
         
         dataset1 = Pet2Dataset(df=df, transforms=model_dict1['TRANSFORM'])
