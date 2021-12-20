@@ -34,6 +34,7 @@ from sklearn.metrics import mean_squared_error, roc_auc_score
 from sklearn.model_selection import KFold,StratifiedKFold
 
 from tqdm import tqdm
+import timm
 
 
 class CFG:
@@ -288,6 +289,9 @@ model_dict5 = {
         ], p=1.0),    
     }
 }
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 pet1_image_all = pd.DataFrame()
