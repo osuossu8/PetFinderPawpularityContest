@@ -54,7 +54,7 @@ class CFG:
     ETA_MIN = 7e-6 # 1e-5
     train_bs = 16 # 8 # 32
     valid_bs = 32 # 16 # 64
-    log_interval = 32 # 100
+    log_interval = 600 # 32 # 100
     train_root = 'input/cat_vs_dog/' # 'input/train_npy/'
     test_root = 'input/test/'
     MODEL_NAME = "swin_large_patch4_window7_224" # "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
