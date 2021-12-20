@@ -309,7 +309,11 @@ pseudo_label_3 = (preds_042[3] + preds_069[3] + preds_055[3] + preds_060[3] + pr
 pseudo_label_4 = (preds_042[4] + preds_069[4] + preds_055[4] + preds_060[4] + preds_062[4])/5
 
 
-pet1_image_all['pseudo_label'] = pseudo_label
+pet1_image_all['pseudo_label_0'] = pseudo_label_0
+pet1_image_all['pseudo_label_1'] = pseudo_label_1
+pet1_image_all['pseudo_label_2'] = pseudo_label_2
+pet1_image_all['pseudo_label_3'] = pseudo_label_3
+pet1_image_all['pseudo_label_4'] = pseudo_label_4
 
 print(pet1_image_all.shape)
 print(pet1_image_all.head())
