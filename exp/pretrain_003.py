@@ -47,7 +47,7 @@ class CFG:
     ######################
     EXP_ID = 'pretrain_003'
     seed = 71
-    epochs = 20
+    epochs = 3 # 20
     folds = [0, 1, 2, 3, 4]
     N_FOLDS = 5
     LR = 2e-5 # 1e-4
@@ -64,7 +64,7 @@ class CFG:
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 224 # 384 # 224 # 512 # 256 # 900
-    EARLY_STOPPING = True
+    EARLY_STOPPING = False # True
     APEX = False # True
     DEBUG = False # True
     FEATURE_COLS = None # [
