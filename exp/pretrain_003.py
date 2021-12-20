@@ -141,7 +141,7 @@ class Pet2Dataset:
 
     def __getitem__(self, item):
         if self.y is not None:
-            path = CFG.train_root + self.X[item] + '.jpg'
+            path = CFG.train_root + self.X[item]
             features = cv2.imread(path)
             features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)           
             if CFG.get_transforms:
@@ -152,11 +152,10 @@ class Pet2Dataset:
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
                 'y': torch.tensor(targets, dtype=torch.float32),
-                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
             }
           
         else:
-            path = CFG.test_root + self.X[item] + '.jpg'
+            path = CFG.test_root + self.X[item]
             features = cv2.imread(path)
             features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
             if CFG.get_transforms:
@@ -165,7 +164,6 @@ class Pet2Dataset:
 
             return {
                 'x': torch.tensor(features, dtype=torch.float32),
-                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
             }
 
 
