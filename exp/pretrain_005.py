@@ -359,7 +359,7 @@ def calc_cv(model_paths):
     y_true = []
     y_pred = []
     for fold, model in enumerate(models):
-        CFG.TARGET_COL = f'pseudo_label_fold_{fold}'
+        CFG.TARGET_COL = f'pseudo_label_{fold}'
 
         val_df = df[df.kfold == fold].reset_index(drop=True)
     
@@ -440,7 +440,7 @@ for fold in range(5):
     logger.info(f"Fold {fold} Training")
     logger.info("=" * 120)
 
-    CFG.TARGET_COL = f'pseudo_label_fold_{fold}'
+    CFG.TARGET_COL = f'pseudo_label_{fold}'
 
     trn_df = train[train.kfold != fold].reset_index(drop=True)
     val_df = train[train.kfold == fold].reset_index(drop=True)
