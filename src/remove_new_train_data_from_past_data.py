@@ -67,6 +67,15 @@ pet1_data = pet1_data[~pet1_data['PetID'].isin(sim_data['pre_id'])].reset_index(
 print(pet1_data.shape)
 print(pet1_data.head())
 
-pet1_data.to_csv('input/petfinder1_train_test_image_with_pseudo_label_rm_new_train_data.csv', index=False)
+sim_eye_grep = pd.read_csv('input/same_img_pair_check_all.csv')
+print(sim_eye_grep['PetID'].nunique())
+print(sim_eye_grep.shape)
+print(sim_eye_grep.head())
+
+pet1_data = pet1_data[~pet1_data['PetID'].isin(sim_eye_grep['PetID'])].reset_index(drop=True)
+print(pet1_data.shape)
+print(pet1_data.head())
+
+pet1_data.to_csv('input/petfinder1_train_test_image_with_pseudo_label_rm_new_train_data_more_clean.csv', index=False)
 
 
