@@ -428,6 +428,11 @@ train = pd.read_csv("input/train_folds_no_dup_5_sep_hard_local_test.csv")
 
 print(train['kfold'].value_counts())
 print(train.shape)
+
+train = train[train.kfold != -1].reset_index(drop=True)
+
+print(train['kfold'].value_counts())
+print(train.shape)
 train.head()
 
 # main loop
