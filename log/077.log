@@ -450,3 +450,4 @@ Epoch 4 - avg_train_loss: 0.62652  avg_val_loss: 0.65083  time: 296s
 Epoch 4 - train_score:15.69668  valid_score:19.00748
 Early Stopping
 cv score 18.236987297377162
+cv score 18.145193728248714

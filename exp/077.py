@@ -89,6 +89,10 @@ CFG.get_transforms = {
             A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),    
+        'test' : A.Compose([
+            A.Resize(288, 288, p=1),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
+        ], p=1.0),
     }
 
 def set_seed(seed=42):
@@ -165,14 +169,43 @@ class Pet2Dataset:
             }
 
 
-def init_layer(layer):
-    nn.init.xavier_uniform_(layer.weight)
+class Pet2DatasetTest:
+    def __init__(self, X, y=None, Meta_features=None):
+        self.X = X
+        self.y = y
+        self.Meta_features = Meta_features
 
-    if hasattr(layer, "bias"):
-        if layer.bias is not None:
-            layer.bias.data.fill_(0.)
-            
-            
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, item):
+        if self.y is not None:
+            path = CFG.train_root + self.X[item] + '.npy'
+            features = np.load(path)
+            if CFG.get_transforms:
+                features = CFG.get_transforms['train'](image=features)['image']
+            features = np.transpose(features, (2, 0, 1)).astype(np.float32)
+            targets = self.y[item]
+
+            return {
+                'x': torch.tensor(features, dtype=torch.float32),
+                'y': torch.tensor(targets, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
+            }
+
+        else:
+            path = CFG.test_root + self.X[item] + '.npy'
+            features = np.load(path)
+            if CFG.get_transforms:
+                features = CFG.get_transforms['test'](image=features)['image']
+            features = np.transpose(features, (2, 0, 1)).astype(np.float32)
+
+            return {
+                'x': torch.tensor(features, dtype=torch.float32),
+                'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
+            }
+
+
 class Pet2Model(nn.Module):
     def __init__(self, model_name):
         super(Pet2Model, self).__init__()    
@@ -251,36 +284,6 @@ class RMSELoss(torch.nn.Module):
     def forward(self,x,y):
         criterion = nn.MSELoss()
         loss = torch.sqrt(criterion(x, y))
-        return loss
-
-
-from torch.nn.modules.loss import _WeightedLoss
-import torch.nn.functional as F
-
-class SmoothBCEwLogits(_WeightedLoss):
-    def __init__(self, weight=None, reduction='mean', smoothing=0.0):
-        super().__init__(weight=weight, reduction=reduction)
-        self.smoothing = smoothing
-        self.weight = weight
-        self.reduction = reduction
-
-    @staticmethod
-    def _smooth(targets:torch.Tensor, n_labels:int, smoothing=0.0):
-        assert 0 <= smoothing < 1
-        with torch.no_grad():
-            targets = targets * (1.0 - smoothing) + 0.5 * smoothing
-        return targets
-
-    def forward(self, inputs, targets):
-        targets = SmoothBCEwLogits._smooth(targets, inputs.size(-1),
-            self.smoothing)
-        loss = F.binary_cross_entropy_with_logits(inputs, targets,self.weight)
-
-        if  self.reduction == 'sum':
-            loss = loss.sum()
-        elif  self.reduction == 'mean':
-            loss = loss.mean()
-
         return loss
 
 
@@ -388,7 +391,7 @@ def calc_cv(model_paths):
     for fold, model in enumerate(models):
         val_df = df[df.kfold == fold].reset_index(drop=True)
     
-        dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+        dataset = Pet2DatasetTest(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
         data_loader = torch.utils.data.DataLoader(
             dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
         )
