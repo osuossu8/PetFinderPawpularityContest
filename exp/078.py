@@ -55,14 +55,13 @@ class CFG:
     log_interval = 32 # 100
     train_root = 'input/train_npy/' # 'input/train_npy/'
     test_root = 'input/test/'
-    MODEL_NAME = "nfnet_l0" # "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
+    MODEL_NAME = "swin_large_patch4_window7_224" # "swin_large_patch4_window12_384" # "swin_base_patch4_window7_224"
     in_chans = 3
     ID_COL = 'Id'
     TARGET_COL = 'Pawpularity'
     TARGET_DIM = 1
     EVALUATION = 'RMSE'
     IMG_SIZE = 224 # 384 # 224 # 512 # 256 # 900
-    TEST_IMG_SIZE = 288
     EARLY_STOPPING = True
     APEX = False # True
     DEBUG = False # True
@@ -87,7 +86,7 @@ CFG.get_transforms = {
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),
         'valid' : A.Compose([
-            A.Resize(CFG.TEST_IMG_SIZE, CFG.TEST_IMG_SIZE, p=1),
+            A.Resize(CFG.IMG_SIZE, CFG.IMG_SIZE, p=1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0,),
         ], p=1.0),    
     }
@@ -140,8 +139,14 @@ class Pet2Dataset:
 
     def __getitem__(self, item):
         if self.y is not None:
-            path = CFG.train_root + self.X[item] + '.npy'
-            features = np.load(path)
+            # path = CFG.train_root + self.X[item] + '.npy'
+            path = self.X[item]
+            suf = path.split('.')[-1]
+            if path == 'npy':
+                features = np.load(path)
+            else:
+                features = cv2.imread(path)
+                features = cv2.cvtColor(features, cv2.COLOR_BGR2RGB)
             if CFG.get_transforms:
                 features = CFG.get_transforms['train'](image=features)['image']
             features = np.transpose(features, (2, 0, 1)).astype(np.float32)
@@ -154,7 +159,8 @@ class Pet2Dataset:
             }
           
         else:
-            path = CFG.test_root + self.X[item] + '.npy'
+            # path = CFG.test_root + self.X[item] + '.npy'
+            path = self.X[item]
             features = np.load(path)
             if CFG.get_transforms:
                 features = CFG.get_transforms['valid'](image=features)['image']
@@ -165,27 +171,27 @@ class Pet2Dataset:
                 'meta': torch.tensor(self.Meta_features[item], dtype=torch.float32),
             }
 
-
+            
 class Pet2Model(nn.Module):
     def __init__(self, model_name):
         super(Pet2Model, self).__init__()    
         
         # Model Encoder
-        self.model = timm.create_model(model_name, pretrained=True, num_classes=0, in_chans=CFG.in_chans)
-        #pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window7_224_22kto1k.pth'
-        #if pretrained_model_path:
-        #    state_dict = dict()
-        #    for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
-        #        if k[:6] == "model.":
-        #            k = k.replace("model.", "")
-        #        if k == 'head.weight':
-        #            continue
-        #        if k == 'head.bias':
-        #            continue
-        #        state_dict[k] = v
-        #    self.model.load_state_dict(state_dict)
-        print("loaded pretrained weight")
-        self.model.head.fc = nn.Linear(self.model.num_features, 128)
+        self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
+        pretrained_model_path = '/root/.cache/torch/checkpoints/swin_large_patch4_window7_224_22kto1k.pth'
+        if pretrained_model_path:
+            state_dict = dict()
+            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
+                if k[:6] == "model.":
+                    k = k.replace("model.", "")
+                if k == 'head.weight':
+                    continue
+                if k == 'head.bias':
+                    continue
+                state_dict[k] = v
+            self.model.load_state_dict(state_dict)
+            print("loaded pretrained weight")
+        self.model.head = nn.Linear(self.model.num_features, 128)
         self.dense = nn.Linear(128, CFG.TARGET_DIM)
 
     def forward(self, features):
@@ -335,23 +341,24 @@ def valid_fn(model, data_loader, device):
 
 
 def calc_cv(model_paths):
-    models = []
-    for model_path in model_paths:
-        model = Pet2Model(CFG.MODEL_NAME)
-        model.to(device)
-        model.load_state_dict(torch.load(model_path))
-        model.eval()
-        models.append(model)
-    
     df = pd.read_csv("input/train_folds_no_dup_5.csv")
+    df['PATH'] = CFG.train_root + df[CFG.ID_COL].values + '.npy'
 
     idx = []
     y_true = []
     y_pred = []
-    for fold, model in enumerate(models):
+    local_test_idx = []
+    y_local_test_true = []
+    y_local_test_pred = []
+    for fold, model_path in enumerate(model_paths):
+        model = Pet2Model(CFG.MODEL_NAME)
+        model.to(device)
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+
         val_df = df[df.kfold == fold].reset_index(drop=True)
     
-        dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+        dataset = Pet2Dataset(X=val_df['PATH'].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
         data_loader = torch.utils.data.DataLoader(
             dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
         )
@@ -383,6 +390,16 @@ def calc_cv(model_paths):
     print(oof_df.shape)
 
 
+def create_folds(data, num_splits):
+    data["kfold"] = -1
+
+    kf = model_selection.KFold(n_splits=num_splits, shuffle=True, random_state=42)
+    for f, (t_, v_) in enumerate(kf.split(X=data)):
+        data.loc[v_, 'kfold'] = f
+    
+    return data
+
+
 OUTPUT_DIR = f'output/{CFG.EXP_ID}/'
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -396,7 +413,17 @@ device = get_device()
 
 # data
 train = pd.read_csv("input/train_folds_no_dup_5.csv")
+train['PATH'] = CFG.train_root + train[CFG.ID_COL].values + '.npy'
 
+prev_train = pd.read_csv("input/petfinder1_train_test_image_with_pseudo_label_rm_new_train_data_more_clean.csv")
+prev_train = create_folds(prev_train, num_splits=5)
+prev_train['PATH'] = 'input/petfinder1_images/' + prev_train['image_name'].values
+
+print(train.shape)
+
+train = train[train.kfold != -1].reset_index(drop=True)
+
+print(train['kfold'].value_counts())
 print(train.shape)
 train.head()
 
@@ -408,19 +435,24 @@ for fold in range(5):
     logger.info(f"Fold {fold} Training")
     logger.info("=" * 120)
 
+    prev_train[CFG.TARGET_COL] = prev_train[f'pseudo_label_{fold}'].values
+    prev_train_df = prev_train[prev_train.kfold != fold].reset_index(drop=True)
+
     trn_df = train[train.kfold != fold].reset_index(drop=True)
     val_df = train[train.kfold == fold].reset_index(drop=True)
+
+    trn_df = pd.concat([trn_df, prev_train_df], 0).reset_index(drop=True)
 
     if CFG.DEBUG:
         trn_df = trn_df.head(64)
         val_df = val_df.head(16)
 
-    train_dataset = Pet2Dataset(X=trn_df[CFG.ID_COL].values, y=trn_df[CFG.TARGET_COL].values, Meta_features=trn_df[CFG.FEATURE_COLS].values)
+    train_dataset = Pet2Dataset(X=trn_df['PATH'].values, y=trn_df[CFG.TARGET_COL].values, Meta_features=trn_df[CFG.FEATURE_COLS].values)
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=CFG.train_bs, num_workers=0, pin_memory=True, shuffle=True
     )
     
-    valid_dataset = Pet2Dataset(X=val_df[CFG.ID_COL].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
+    valid_dataset = Pet2Dataset(X=val_df['PATH'].values, y=val_df[CFG.TARGET_COL].values, Meta_features=val_df[CFG.FEATURE_COLS].values)
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=CFG.valid_bs, num_workers=0, pin_memory=True, shuffle=False
     )
