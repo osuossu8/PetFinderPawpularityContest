@@ -142,7 +142,7 @@ class Pet2Dataset:
             # path = CFG.train_root + self.X[item] + '.npy'
             path = self.X[item]
             suf = path.split('.')[-1]
-            if path == 'npy':
+            if suf == 'npy':
                 features = np.load(path)
             else:
                 features = cv2.imread(path)
