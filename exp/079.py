@@ -196,12 +196,15 @@ class Pet2Model(nn.Module):
         # Model Encoder
         self.model = timm.create_model(model_name, pretrained=True, num_classes=0, in_chans=CFG.in_chans)
         print("loaded pretrained weight")
-        nc = list(self.model.children())[-1].in_features
         self.encoder = nn.Sequential(*list(self.model.children())[:-2])
         self.head = nn.Sequential(
                 GeM(),
                 Flatten(),
-                nn.Linear(nc, CFG.TARGET_DIM))
+                nn.Linear(2048,512),
+                nn.ReLU(inplace=True),
+                nn.LayerNorm(512), 
+                nn.Dropout(0.5),
+                nn.Linear(512, CFG.TARGET_DIM))
 
     def forward(self, features):
         x = self.encoder(features)
