@@ -231,7 +231,7 @@ class CosineAnnealingWarmupRestartsV2(_LRScheduler):
         self.cycle = 0 # cycle count
         self.step_in_cycle = last_epoch # step size of the current cycle
         
-        super(CosineAnnealingWarmupRestarts, self).__init__(optimizer, last_epoch)
+        super(CosineAnnealingWarmupRestartsV2, self).__init__(optimizer, last_epoch)
         
         # set learning rate min_lr
         self.init_lr()
@@ -397,6 +397,8 @@ def train_fn_calc_cv_interval(epoch, model, train_data_loader, valid_data_loader
                 torch.save(model.state_dict(), OUTPUT_DIR+f'fold-{fold}.bin')
                 best_score = valid_avg[CFG.EVALUATION]
 
+            # inner fold scheduler step
+            scheduler.step()
             model.train() 
 
     return scores.avg, losses.avg, valid_avg, valid_loss, best_score
