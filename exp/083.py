@@ -187,9 +187,9 @@ class Pet2Model(nn.Module):
                 if k[:6] == "model.":
                     k = k.replace("model.", "")
                 if k == 'head.weight':
-                    state_dict[k] = v[:80, :]
+                    state_dict[k] = v[:80, :] # torch.cat([v[:80, :], v[910:, :]])
                 elif k == 'head.bias':
-                    state_dict[k] = v[:80]
+                    state_dict[k] = v[:80] # torch.cat([v[:80], v[910:]])
                 else:
                     state_dict[k] = v
         self.model.head = nn.Linear(1536, 80)
