@@ -38,8 +38,6 @@ from sklearn.model_selection import KFold,StratifiedKFold
 import timm
 from tqdm import tqdm
 
-from apex import amp
-
 
 class CFG:
     ######################
