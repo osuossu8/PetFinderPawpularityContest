@@ -178,25 +178,29 @@ class Pet2Model(nn.Module):
         super(Pet2Model, self).__init__()    
         
         # Model Encoder
-        self.model = timm.create_model(model_name, pretrained=True, num_classes=0, in_chans=CFG.in_chans)
-        # pretrained_model_path = '/root/.cache/torch/checkpoints/swin_base_patch4_window7_224_22kto1k.pth'
-        # if pretrained_model_path:
-        #     state_dict = dict()
-        #     for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
-        #         if k[:6] == "model.":
-        #             k = k.replace("model.", "")
-        #         if k == 'head.weight':
-        #             continue
-        #         if k == 'head.bias':
-        #             continue
-        #         state_dict[k] = v
-        #     self.model.load_state_dict(state_dict)
+        self.model = timm.create_model(model_name, pretrained=False, num_classes=0, in_chans=CFG.in_chans)
+        pretrained_model_path = '/root/.cache/torch/checkpoints/deit_base_distilled_patch16_384-d0272ac0.pth'
+        if pretrained_model_path:
+            state_dict = dict()
+            for k, v in torch.load(pretrained_model_path, map_location='cpu')["model"].items():
+                if k[:6] == "model.":
+                    k = k.replace("model.", "")
+                if k == 'head.weight':
+                    continue
+                if k == 'head.bias':
+                    continue
+                if k == 'head_dist.weight':
+                    continue
+                if k == 'head_dist.bias':
+                    continue
+                state_dict[k] = v
+            self.model.load_state_dict(state_dict)
         print("loaded pretrained weight")
-        self.model.head = nn.Linear(self.model.num_features, 128)
-        self.dense = nn.Linear(128, CFG.TARGET_DIM)
+        self.dense = nn.Linear(768, CFG.TARGET_DIM)
 
     def forward(self, features):
-        x = self.model(features)
+        x1, x2 = self.model(features) # (bs, 768), (bs, 768)
+        x = x1 + x2
         output = self.dense(x)
         return output.squeeze(-1)
 
